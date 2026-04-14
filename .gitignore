@@ -1,0 +1,12 @@
+.env
+__pycache__/
+.venv/
+*.pyc
+reports/
+transcripts/
+assets/fonts/
+*.m4a
+*.mp3
+*.wav
+*.ogg
+*.flac
