@@ -412,12 +412,7 @@ with st.sidebar:
             except FileNotFoundError:
                 st.warning("Template introuvable.")
 
-    st.divider()
-
-    # Sauvegarde
-    st.markdown('<p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:0.3rem">Dossier de sauvegarde</p>', unsafe_allow_html=True)
-    onedrive_path = st.text_input("Destination", placeholder="C:/Users/…/OneDrive/Réunions",
-        label_visibility="collapsed")
+    onedrive_path = ""
 
     st.divider()
 
