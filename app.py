@@ -555,11 +555,18 @@ if ss.phase == "upload":
                 )
 
                 if audio_data and audio_data.get("bytes"):
-                    recorded_bytes  = audio_data["bytes"]
-                    _fmt            = audio_data.get("format", "audio/webm").split(";")[0]
-                    _ext_map        = {"audio/webm": ".webm", "audio/ogg": ".ogg",
-                                       "audio/wav": ".wav", "audio/mp4": ".mp4"}
-                    _rec_ext        = _ext_map.get(_fmt, ".webm")
+                    recorded_bytes = audio_data["bytes"]
+                    # Detect real format via magic bytes — don't trust browser's claimed format
+                    if recorded_bytes[:4] == b'\x1a\x45\xdf\xa3':
+                        _rec_ext, _fmt = ".webm", "audio/webm"
+                    elif recorded_bytes[:4] == b'OggS':
+                        _rec_ext, _fmt = ".ogg",  "audio/ogg"
+                    elif recorded_bytes[:4] == b'RIFF':
+                        _rec_ext, _fmt = ".wav",  "audio/wav"
+                    elif recorded_bytes[4:8] == b'ftyp':
+                        _rec_ext, _fmt = ".mp4",  "audio/mp4"
+                    else:
+                        _rec_ext, _fmt = ".webm", "audio/webm"
                     st.audio(recorded_bytes, format=_fmt)
                     rec_filename = f"enregistrement_{_dt.now().strftime('%Y%m%d_%H%M%S')}{_rec_ext}"
                     st.download_button(
