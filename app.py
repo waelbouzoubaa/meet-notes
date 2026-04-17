@@ -22,6 +22,7 @@ from processor import (
 from transcribe import transcribe_audio
 from summarize import summarize_transcript
 from pdf_export import generate_pdf
+from docx_export import generate_docx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -628,7 +629,7 @@ elif ss.phase == "reported":
         with tab_report:
             st.markdown(ss.report)
             st.divider()
-            col_md, col_pdf = st.columns(2)
+            col_md, col_docx, col_pdf = st.columns(3)
             with col_md:
                 st.download_button(
                     label="⬇  Télécharger (.md)",
@@ -637,6 +638,18 @@ elif ss.phase == "reported":
                     mime="text/markdown",
                     use_container_width=True,
                 )
+            with col_docx:
+                try:
+                    docx_bytes = generate_docx(ss.report, ss.audio_stem)
+                    st.download_button(
+                        label="⬇  Télécharger (.docx)",
+                        data=docx_bytes,
+                        file_name=f"{ss.audio_stem}_report.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                    )
+                except Exception as e:
+                    st.error(f"Erreur export Word : {e}")
             with col_pdf:
                 try:
                     pdf_bytes = generate_pdf(ss.report, ss.audio_stem)
