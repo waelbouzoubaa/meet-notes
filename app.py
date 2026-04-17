@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from processor import (
     list_templates,
     load_template,
+    save_template,
     extract_speakers,
     apply_speaker_names,
     build_system_prompt,
@@ -336,6 +337,11 @@ for k, v in defaults.items():
         st.session_state[k] = v
 ss = st.session_state
 
+# ── Toast persistant après rerun ───────────────────────────────────────────────
+if "_toast" in ss:
+    _icon, _msg = ss.pop("_toast")
+    st.toast(_msg, icon=_icon)
+
 # ── Template metadata ──────────────────────────────────────────────────────────
 TEMPLATE_META = {
     "commercial":   ("💼", "Opportunités, engagements clients, prochaines étapes"),
@@ -401,17 +407,62 @@ with st.sidebar:
 
     st.caption(tmeta(selected_template)[1])
 
+    _BUILTIN_TEMPLATES = {"socle_commun", "chantier", "securite", "direction", "suivi_projet", "commerciale"}
+
     if selected_template == "custom":
-        custom_prompt_text = st.text_area("Prompt système", height=140,
-            value="Tu es un assistant de réunion. Résume le transcript en Markdown.",
+        # Pre-fill with socle_commun so the user can just tweak it
+        try:
+            _default_prompt = load_template("socle_commun")
+        except FileNotFoundError:
+            _default_prompt = "Tu es un assistant de réunion professionnel. Résume le transcript en Markdown."
+
+        custom_prompt_text = st.text_area("Prompt système", height=200,
+            value=_default_prompt,
             label_visibility="visible")
+
+        st.caption("Modifiez le prompt ci-dessus puis enregistrez-le comme nouveau template.")
+        _new_name = st.text_input("Nom du template", placeholder="ex: réunion_chantier_v2",
+            label_visibility="visible")
+        if st.button("💾  Enregistrer comme template", use_container_width=True):
+            _clean = _new_name.strip().lower().replace(" ", "_")
+            if not _clean:
+                st.warning("Saisissez un nom avant d'enregistrer.")
+            elif _clean in _BUILTIN_TEMPLATES:
+                st.error("Ce nom est réservé à un template intégré.")
+            else:
+                save_template(_clean, custom_prompt_text)
+                ss["_toast"] = ("✅", f"Template « {_clean} » enregistré !")
+                st.rerun()
     else:
         custom_prompt_text = ""
-        with st.expander("Voir le prompt", expanded=False):
+        if selected_template in _BUILTIN_TEMPLATES:
+            # Lecture seule pour les templates intégrés
+            with st.expander("Voir le prompt", expanded=False):
+                try:
+                    st.code(load_template(selected_template), language="text")
+                except FileNotFoundError:
+                    st.warning("Template introuvable.")
+        else:
+            # Templates utilisateur : édition + suppression
             try:
-                st.code(load_template(selected_template), language="text")
+                _current_content = load_template(selected_template)
             except FileNotFoundError:
-                st.warning("Template introuvable.")
+                _current_content = ""
+            _edited = st.text_area("Modifier le prompt", height=200,
+                value=_current_content, label_visibility="visible")
+            col_save, col_del = st.columns(2)
+            with col_save:
+                if st.button("💾  Enregistrer", use_container_width=True):
+                    save_template(selected_template, _edited)
+                    ss["_toast"] = ("✅", f"Template « {selected_template} » enregistré !")
+                    st.rerun()
+            with col_del:
+                if st.button("🗑  Supprimer", use_container_width=True, type="secondary"):
+                    _tpath = Path(__file__).parent / "templates" / f"{selected_template}.txt"
+                    if _tpath.exists():
+                        _tpath.unlink()
+                    ss["_toast"] = ("🗑", f"Template « {selected_template} » supprimé.")
+                    st.rerun()
 
     onedrive_path = ""
 
@@ -477,11 +528,50 @@ if ss.phase == "upload":
     col_upload, col_opts = st.columns([3, 2], gap="large")
 
     with col_upload:
-        st.markdown('<div class="card"><p class="card-label">Fichier audio</p>', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("audio",
-            type=["mp3", "wav", "m4a", "ogg", "flac", "aac", "webm"],
-            label_visibility="collapsed",
-            help="Formats acceptés : mp3 · wav · m4a · ogg · flac · aac · webm")
+        st.markdown('<div class="card"><p class="card-label">Source audio</p>', unsafe_allow_html=True)
+        tab_upload, tab_record = st.tabs(["📁  Importer un fichier", "🎙  Enregistrer"])
+
+        with tab_upload:
+            uploaded_file = st.file_uploader("audio",
+                type=["mp3", "wav", "m4a", "ogg", "flac", "aac", "webm"],
+                label_visibility="collapsed",
+                help="Formats acceptés : mp3 · wav · m4a · ogg · flac · aac · webm")
+            recorded_audio = None
+
+        with tab_record:
+            try:
+                from streamlit_mic_recorder import mic_recorder
+                from datetime import datetime as _dt
+
+                st.caption("Cliquez sur le bouton pour démarrer · Recliquez pour arrêter")
+
+                audio_data = mic_recorder(
+                    start_prompt="🎙  Démarrer l'enregistrement",
+                    stop_prompt="⏹  Arrêter",
+                    just_once=False,
+                    use_container_width=True,
+                    key="mic",
+                )
+
+                if audio_data and audio_data.get("bytes"):
+                    recorded_bytes = audio_data["bytes"]
+                    st.audio(recorded_bytes, format="audio/wav")
+                    rec_filename = f"enregistrement_{_dt.now().strftime('%Y%m%d_%H%M%S')}.wav"
+                    st.download_button(
+                        label="⬇  Télécharger l'enregistrement (.wav)",
+                        data=recorded_bytes,
+                        file_name=rec_filename,
+                        mime="audio/wav",
+                        use_container_width=True,
+                    )
+                    recorded_audio = recorded_bytes
+                    uploaded_file  = None
+                else:
+                    recorded_audio = None
+            except ImportError:
+                st.warning("Module `streamlit-mic-recorder` non installé.")
+                recorded_audio = None
+
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_opts:
@@ -492,11 +582,21 @@ if ss.phase == "upload":
         transcript_only = st.checkbox("Transcription uniquement (sans rapport)", value=False)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    if uploaded_file:
-        size_mb = uploaded_file.size / (1024 * 1024)
+    # ── Source active : fichier uploadé ou enregistrement ──────────────────────
+    audio_source   = uploaded_file or (recorded_audio is not None and recorded_audio)
+    audio_is_rec   = recorded_audio is not None and not uploaded_file
+
+    if audio_source:
+        if audio_is_rec:
+            display_name = "enregistrement.wav"
+            size_mb      = len(recorded_audio) / (1024 * 1024)
+        else:
+            display_name = uploaded_file.name
+            size_mb      = uploaded_file.size / (1024 * 1024)
+
         icon, _ = tmeta(selected_template)
         st.markdown(
-            f'<div class="info-strip">📎 <strong>{uploaded_file.name}</strong>'
+            f'<div class="info-strip">📎 <strong>{display_name}</strong>'
             f'&nbsp;·&nbsp;{size_mb:.1f} Mo'
             f'&nbsp;·&nbsp;Template : <strong>{icon} {selected_template.replace("_"," ").title()}</strong></div>',
             unsafe_allow_html=True)
@@ -506,13 +606,21 @@ if ss.phase == "upload":
             st.stop()
 
         if st.button("▶  Lancer l'analyse", type="primary"):
-            suffix = Path(uploaded_file.name).suffix
+            if audio_is_rec:
+                suffix = ".wav"
+                audio_bytes = recorded_audio
+                stem = "enregistrement"
+            else:
+                suffix = Path(uploaded_file.name).suffix
+                audio_bytes = uploaded_file.getbuffer()
+                stem = Path(uploaded_file.name).stem
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(uploaded_file.getbuffer())
+                tmp.write(audio_bytes)
                 tmp_path = Path(tmp.name)
             try:
                 with st.status("Transcription en cours…", expanded=True) as status:
-                    st.write(f"Envoi de **{uploaded_file.name}** vers Gemini Files API…")
+                    st.write(f"Envoi de **{display_name}** vers Gemini Files API…")
                     transcript, elapsed = transcribe_audio(tmp_path, language)
                     status.update(label=f"Transcription terminée en {elapsed:.1f} s",
                         state="complete", expanded=False)
@@ -525,7 +633,7 @@ if ss.phase == "upload":
 
             ss.transcript_raw        = transcript
             ss.transcript_named      = transcript
-            ss.audio_stem            = Path(uploaded_file.name).stem
+            ss.audio_stem            = stem
             ss.elapsed_transcription = elapsed
             ss._extra_context        = extra_context
             ss._transcript_only      = transcript_only

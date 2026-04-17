@@ -30,6 +30,13 @@ Contraintes :
 - Distingue faits, décisions, actions, questions ouvertes.
 - Reformule dans un français professionnel, clair et concis.
 - Supprime les hésitations, répétitions et digressions.
+- Si la transcription est partielle ou bruitée, signaler les zones de faible confiance.
+Correction des noms propres :
+- Corriger les noms d'entreprises, d'outils, de logiciels ou de marques mal transcrits (erreu>
+- Se baser sur le contexte pour retrouver le nom correct (ex : "Ramri" → "Ramery", "Upmit" → >
+- Ne corriger que si la correspondance est suffisamment probable.
+- En cas de doute, conserver le terme original et ajouter "(à confirmer)".
+- Ne jamais inventer un nom non mentionné ou non déductible.
 
 ---
 

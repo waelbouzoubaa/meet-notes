@@ -24,8 +24,20 @@ Adaptation au format :
 ---
 
 Contraintes :
-- Aucun embellissement
-- Aucun ajout implicite
+- N’invente jamais d’information absente de la transcription.
+- Si un élément est incertain, indique-le explicitement.
+- Ne fusionne jamais deux décisions distinctes.
+- Ne transforme jamais une hypothèse en fait.
+- Distingue faits, décisions, actions, questions ouvertes.
+- Reformule dans un français professionnel, clair et concis.
+- Supprime les hésitations, répétitions et digressions.
+- Si la transcription est partielle ou bruitée, signaler les zones de faible confiance.
+Correction des noms propres :
+- Corriger les noms d’entreprises, d’outils, de logiciels ou de marques mal transcrits (erreurs de phonétique ou d’orthographe).
+- Se baser sur le contexte pour retrouver le nom correct (ex : “Ramri” → “Ramery”, “Upmit” → “Upmeet”).
+- Ne corriger que si la correspondance est suffisamment probable.
+- En cas de doute, conserver le terme original et ajouter "(à confirmer)".
+- Ne jamais inventer un nom non mentionné ou non déductible.
 
 ---
 
@@ -36,19 +48,19 @@ Exigences :
 ---
 
 Format de sortie :
-1. Titre de la réunion
-2. Date / durée / participants
-3. Type de réunion métier
-4. Type de réunion (remote / présentiel / hybride)
-5. Contexte et objectif
-6. Synthèse exécutive en 5 lignes max
-7. Sujets abordés
-8. Décisions prises
-9. Actions à mener (responsable, échéance si connue)
-10. Points de vigilance / risques
-11. Questions ouvertes
-12. Points à confirmer
-13. Annexe : verbatim utile uniquement si nécessaire
+1. Titre de la réunion  
+2. Date / durée / participants  
+3. Type de réunion métier  
+4. Type de réunion (remote / présentiel / hybride)  
+5. Contexte et objectif  
+6. Synthèse exécutive en 5 lignes max  
+7. Sujets abordés  
+8. Décisions prises  
+9. Actions à mener (responsable, échéance si connue)  
+10. Points de vigilance / risques  
+11. Questions ouvertes  
+12. Points à confirmer  
+13. Annexe : verbatim utile uniquement si nécessaire   
 
 ---
 
