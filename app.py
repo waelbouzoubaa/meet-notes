@@ -536,6 +536,9 @@ if ss.phase == "upload":
                 type=["mp3", "wav", "m4a", "ogg", "flac", "aac", "webm"],
                 label_visibility="collapsed",
                 help="Formats acceptés : mp3 · wav · m4a · ogg · flac · aac · webm")
+            if uploaded_file:
+                ss.pop("_rec_bytes", None)
+                ss.pop("_rec_ext", None)
             recorded_audio     = None
             recorded_audio_ext = ".webm"
 
@@ -567,6 +570,9 @@ if ss.phase == "upload":
                         _rec_ext, _fmt = ".mp4",  "audio/mp4"
                     else:
                         _rec_ext, _fmt = ".webm", "audio/webm"
+                    # Persist in session state so the value survives the button-click rerun
+                    ss["_rec_bytes"] = recorded_bytes
+                    ss["_rec_ext"]   = _rec_ext
                     st.audio(recorded_bytes, format=_fmt)
                     rec_filename = f"enregistrement_{_dt.now().strftime('%Y%m%d_%H%M%S')}{_rec_ext}"
                     st.download_button(
@@ -576,11 +582,11 @@ if ss.phase == "upload":
                         mime=_fmt,
                         use_container_width=True,
                     )
-                    recorded_audio     = recorded_bytes
-                    recorded_audio_ext = _rec_ext
-                    uploaded_file      = None
-                else:
-                    recorded_audio = None
+                    uploaded_file = None
+
+                # Always read from session state so value is correct after rerun
+                recorded_audio     = ss.get("_rec_bytes")
+                recorded_audio_ext = ss.get("_rec_ext", ".webm")
             except ImportError:
                 st.warning("Module `streamlit-mic-recorder` non installé.")
                 recorded_audio     = None
