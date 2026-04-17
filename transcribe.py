@@ -208,11 +208,22 @@ def _split_audio(audio_path: Path, chunk_duration_ms: int = CHUNK_DURATION_MS) -
             "Et assure-toi que ffmpeg est installé sur ton système."
         )
 
-    ext = audio_path.suffix.lstrip(".")
-    # pydub uses 'mp4' as format name for m4a/aac containers
-    load_fmt = "mp4" if ext in ("m4a", "aac") else ext
+    # Detect real format via magic bytes — file extension may be wrong (e.g. .wav with WebM content)
+    with open(audio_path, "rb") as _f:
+        _header = _f.read(12)
+    if _header[:4] == b'\x1a\x45\xdf\xa3':
+        load_fmt = "webm"
+    elif _header[:4] == b'OggS':
+        load_fmt = "ogg"
+    elif _header[:4] == b'RIFF':
+        load_fmt = "wav"
+    elif _header[4:8] == b'ftyp':
+        load_fmt = "mp4"
+    else:
+        ext = audio_path.suffix.lstrip(".")
+        load_fmt = "mp4" if ext in ("m4a", "aac") else ext
 
-    print(f"  Chargement de l'audio ({audio_path.name})…")
+    print(f"  Chargement de l'audio ({audio_path.name}, format détecté : {load_fmt})…")
     audio = AudioSegment.from_file(str(audio_path), format=load_fmt)
     total_ms = len(audio)
     total_min = total_ms / 60000
