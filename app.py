@@ -536,7 +536,8 @@ if ss.phase == "upload":
                 type=["mp3", "wav", "m4a", "ogg", "flac", "aac", "webm"],
                 label_visibility="collapsed",
                 help="Formats acceptés : mp3 · wav · m4a · ogg · flac · aac · webm")
-            recorded_audio = None
+            recorded_audio     = None
+            recorded_audio_ext = ".webm"
 
         with tab_record:
             try:
@@ -554,23 +555,29 @@ if ss.phase == "upload":
                 )
 
                 if audio_data and audio_data.get("bytes"):
-                    recorded_bytes = audio_data["bytes"]
-                    st.audio(recorded_bytes, format="audio/wav")
-                    rec_filename = f"enregistrement_{_dt.now().strftime('%Y%m%d_%H%M%S')}.wav"
+                    recorded_bytes  = audio_data["bytes"]
+                    _fmt            = audio_data.get("format", "audio/webm").split(";")[0]
+                    _ext_map        = {"audio/webm": ".webm", "audio/ogg": ".ogg",
+                                       "audio/wav": ".wav", "audio/mp4": ".mp4"}
+                    _rec_ext        = _ext_map.get(_fmt, ".webm")
+                    st.audio(recorded_bytes, format=_fmt)
+                    rec_filename = f"enregistrement_{_dt.now().strftime('%Y%m%d_%H%M%S')}{_rec_ext}"
                     st.download_button(
-                        label="⬇  Télécharger l'enregistrement (.wav)",
+                        label=f"⬇  Télécharger l'enregistrement ({_rec_ext})",
                         data=recorded_bytes,
                         file_name=rec_filename,
-                        mime="audio/wav",
+                        mime=_fmt,
                         use_container_width=True,
                     )
-                    recorded_audio = recorded_bytes
-                    uploaded_file  = None
+                    recorded_audio     = recorded_bytes
+                    recorded_audio_ext = _rec_ext
+                    uploaded_file      = None
                 else:
                     recorded_audio = None
             except ImportError:
                 st.warning("Module `streamlit-mic-recorder` non installé.")
-                recorded_audio = None
+                recorded_audio     = None
+                recorded_audio_ext = ".webm"
 
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -588,7 +595,7 @@ if ss.phase == "upload":
 
     if audio_source:
         if audio_is_rec:
-            display_name = "enregistrement.wav"
+            display_name = f"enregistrement{recorded_audio_ext}"
             size_mb      = len(recorded_audio) / (1024 * 1024)
         else:
             display_name = uploaded_file.name
@@ -607,7 +614,7 @@ if ss.phase == "upload":
 
         if st.button("▶  Lancer l'analyse", type="primary"):
             if audio_is_rec:
-                suffix = ".wav"
+                suffix = recorded_audio_ext
                 audio_bytes = recorded_audio
                 stem = "enregistrement"
             else:
