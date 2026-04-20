@@ -1,0 +1,45 @@
+services:
+  traefik:
+    image: traefik:latest
+    restart: unless-stopped
+    command:
+      - "--global.sendanonymoususage=false"
+      - "--log.level=INFO"
+      - "--api"
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.asDefault=true"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.websecure.http.tls.domains[0].main=${MAIN_DOMAIN}"
+      - "--entrypoints.websecure.http.tls.domains[0].sans=*.${MAIN_DOMAIN}"
+      - "--entrypoints.websecure.http.tls.certresolver=letsencrypt"
+      - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=ovh"
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      OVH_ENDPOINT: ${OVH_ENDPOINT}
+      OVH_APPLICATION_KEY: ${OVH_APPLICATION_KEY}
+      OVH_APPLICATION_SECRET: ${OVH_APPLICATION_SECRET}
+      OVH_CONSUMER_KEY: ${OVH_CONSUMER_KEY}
+    volumes:
+      - ./letsencrypt:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - infra_networks
+
+networks:
+  infra_networks:
+    name: infra_networks
+    driver: bridge
