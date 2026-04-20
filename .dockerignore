@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.env
+reports/
+transcripts/
+deja_fait.txt
+token_cache.json
+*.m4a
+*.mp3
+*.wav
+*.webm
+*.ogg
+.git/

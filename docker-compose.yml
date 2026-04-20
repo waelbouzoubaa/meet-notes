@@ -1,0 +1,25 @@
+services:
+  meet-notes:
+    build: .
+    image: meet-notes:latest
+    container_name: meet-notes
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      - ./reports:/app/reports
+      - ./transcripts:/app/transcripts
+    # labels:  # Traefik — à activer plus tard
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.meet-notes.rule=Host(`meet.tondomaine.com`)"
+    #   - "traefik.http.routers.meet-notes.entrypoints=websecure"
+    #   - "traefik.http.routers.meet-notes.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.meet-notes.loadbalancer.server.port=8501"
+    # networks:  # à activer avec Traefik
+    #   - traefik-public
+
+# networks:
+#   traefik-public:
+#     external: true
