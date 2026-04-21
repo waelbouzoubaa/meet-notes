@@ -30,7 +30,7 @@ load_dotenv()
 
 st.set_page_config(
     page_title="Meet Notes — Ramery",
-    page_icon="assets/logo.png",
+    page_icon="assets/favicon_round.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
