@@ -23,7 +23,7 @@ from google.genai import types
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-3-flash-preview"
 
 # Files above this size (MB) are split into chunks before transcription
 # Lowered from 20 to 8 MB — Gemini hallucinates on long single-file audio
