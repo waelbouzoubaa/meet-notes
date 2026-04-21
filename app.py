@@ -1,4 +1,4 @@
-"""Meet Notes — Streamlit Interface — Ramery Edition."""
+"""KaptNotes — Streamlit Interface — Ramery Edition."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(
-    page_title="Meet Notes — Ramery",
+    page_title="KaptNotes — Ramery",
     page_icon="assets/favicon_round.png",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -300,6 +300,11 @@ html, body, [class*="css"] {
 }
 [data-testid="stExpander"] summary { color: #94A3B8 !important; }
 
+/* ── Hide Streamlit toolbar & menu ── */
+[data-testid="stToolbar"] { display: none !important; }
+#MainMenu { display: none !important; }
+header { visibility: hidden !important; }
+
 /* ── Divider ── */
 hr { border-color: rgba(255,255,255,0.07) !important; }
 
@@ -373,7 +378,7 @@ with st.sidebar:
                      style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;"/>
                 <div>
                     <p class="sidebar-logo-title">Ramery</p>
-                    <p class="sidebar-logo-sub">Meet Notes</p>
+                    <p class="sidebar-logo-sub">KaptNotes</p>
                 </div>
             </div>
             <div class="sidebar-logo-bar"></div>
@@ -382,7 +387,7 @@ with st.sidebar:
     else:
         st.markdown("""
         <div class="sidebar-logo">
-            <p class="sidebar-logo-title">🎙 Meet Notes</p>
+            <p class="sidebar-logo-title">🎙 KaptNotes</p>
             <p class="sidebar-logo-sub">Ramery</p>
             <div class="sidebar-logo-bar"></div>
         </div>
@@ -478,7 +483,7 @@ st.markdown(f"""
 <div class="hero">
   <div class="hero-left">
     <div class="hero-eyebrow">Gemini 2.5 Flash · Ramery</div>
-    <h1 class="hero-title">Meet Notes</h1>
+    <h1 class="hero-title">KaptNotes</h1>
     <p class="hero-sub">Transcription · Diarisation · Compte rendu automatisé</p>
   </div>
   <div class="hero-badge">
