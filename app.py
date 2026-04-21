@@ -478,7 +478,7 @@ with st.sidebar:
 
 
 # ── Hero ───────────────────────────────────────────────────────────────────────
-phase_labels = {"upload": "Upload", "transcribed": "Transcription", "reported": "Rapport"}
+phase_labels = {"upload": "Upload", "transcribing": "Transcription", "transcribed": "Participants", "reporting": "Rapport", "reported": "Rapport"}
 st.markdown(f"""
 <div class="hero">
   <div class="hero-left">
@@ -495,12 +495,12 @@ st.markdown(f"""
 
 # ── Stepper ────────────────────────────────────────────────────────────────────
 STEPS = [
-    ("upload",      "📁", "Upload"),
-    ("transcribed", "🎙", "Transcription"),
-    ("transcribed", "👥", "Participants"),
-    ("reported",    "📄", "Rapport"),
+    ("upload",        "📁", "Upload"),
+    ("transcribing",  "🎙", "Transcription"),
+    ("transcribed",   "👥", "Participants"),
+    ("reporting",     "📄", "Rapport"),
 ]
-order = ["upload", "transcribed", "reported"]
+order = ["upload", "transcribing", "transcribed", "reporting", "reported"]
 cur   = order.index(ss.phase) if ss.phase in order else 0
 
 html = '<div class="stepper-wrap">'
@@ -632,38 +632,48 @@ if ss.phase == "upload":
 
         if st.button("▶  Lancer l'analyse", type="primary"):
             if audio_is_rec:
-                suffix = recorded_audio_ext
-                audio_bytes = recorded_audio
-                stem = "enregistrement"
+                ss._pending_suffix   = recorded_audio_ext
+                ss._pending_bytes    = bytes(recorded_audio)
+                ss._pending_stem     = "enregistrement"
             else:
-                suffix = Path(uploaded_file.name).suffix
-                audio_bytes = uploaded_file.getbuffer()
-                stem = Path(uploaded_file.name).stem
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(audio_bytes)
-                tmp_path = Path(tmp.name)
-            try:
-                with st.status("Transcription en cours…", expanded=True) as status:
-                    st.write(f"Envoi de **{display_name}** vers Gemini Files API…")
-                    transcript, elapsed = transcribe_audio(tmp_path, language)
-                    status.update(label=f"Transcription terminée en {elapsed:.1f} s",
-                        state="complete", expanded=False)
-            except Exception as e:
-                st.error(f"Erreur transcription : {e}")
-                tmp_path.unlink(missing_ok=True)
-                st.stop()
-            finally:
-                tmp_path.unlink(missing_ok=True)
-
-            ss.transcript_raw        = transcript
-            ss.transcript_named      = transcript
-            ss.audio_stem            = stem
-            ss.elapsed_transcription = elapsed
-            ss._extra_context        = extra_context
-            ss._transcript_only      = transcript_only
-            ss.phase                 = "transcribed"
+                ss._pending_suffix   = Path(uploaded_file.name).suffix
+                ss._pending_bytes    = bytes(uploaded_file.getbuffer())
+                ss._pending_stem     = Path(uploaded_file.name).stem
+            ss._pending_display  = display_name
+            ss._extra_context    = extra_context
+            ss._transcript_only  = transcript_only
+            ss.phase             = "transcribing"
             st.rerun()
+            st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 1b — Transcription en cours
+# ══════════════════════════════════════════════════════════════════════════════
+elif ss.phase == "transcribing":
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ss._pending_suffix) as tmp:
+        tmp.write(ss._pending_bytes)
+        tmp_path = Path(tmp.name)
+    try:
+        with st.status("Transcription en cours…", expanded=True) as status:
+            st.write(f"Envoi de **{ss._pending_display}** vers Gemini Files API…")
+            transcript, elapsed = transcribe_audio(tmp_path, language)
+            status.update(label=f"Transcription terminée en {elapsed:.1f} s",
+                state="complete", expanded=False)
+    except Exception as e:
+        st.error(f"Erreur transcription : {e}")
+        tmp_path.unlink(missing_ok=True)
+        ss.phase = "upload"
+        st.stop()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    ss.transcript_raw        = transcript
+    ss.transcript_named      = transcript
+    ss.audio_stem            = ss._pending_stem
+    ss.elapsed_transcription = elapsed
+    ss.phase                 = "transcribed"
+    st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -737,15 +747,35 @@ elif ss.phase == "transcribed":
             ss.phase  = "reported"
             st.rerun()
         else:
-            system_prompt = build_system_prompt(selected_template, extra_context, custom_prompt_text)
-            with st.status("Génération du rapport…", expanded=True) as status:
-                st.write(f"Analyse avec le template **{selected_template.replace('_',' ').title()}**…")
-                report = summarize_transcript(ss.transcript_named, system_prompt=system_prompt)
-                status.update(label="Rapport généré avec succès !", state="complete", expanded=False)
-            ss.report = report
-            save_output(report, ss.audio_stem, "report", "MANUAL", extra_dir)
-            ss.phase = "reported"
+            ss._pending_template      = selected_template
+            ss._pending_extra_context = extra_context
+            ss._pending_custom_prompt = custom_prompt_text
+            ss.phase                  = "reporting"
             st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 2b — Génération du rapport
+# ══════════════════════════════════════════════════════════════════════════════
+elif ss.phase == "reporting":
+    system_prompt = build_system_prompt(
+        ss._pending_template,
+        ss._pending_extra_context,
+        ss._pending_custom_prompt,
+    )
+    try:
+        with st.status("Génération du rapport…", expanded=True) as status:
+            st.write(f"Analyse avec le template **{ss._pending_template.replace('_',' ').title()}**…")
+            report = summarize_transcript(ss.transcript_named, system_prompt=system_prompt)
+            status.update(label="Rapport généré avec succès !", state="complete", expanded=False)
+    except Exception as e:
+        st.error(f"Erreur génération : {e}")
+        ss.phase = "transcribed"
+        st.stop()
+    ss.report = report
+    save_output(report, ss.audio_stem, "report", "MANUAL", None)
+    ss.phase = "reported"
+    st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
