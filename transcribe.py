@@ -22,7 +22,8 @@ from google.genai import types
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY    = os.getenv("GEMINI_API_KEY")
+ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
 MODEL = "gemini-3-flash-preview"
 
 # Files above this size (MB) are split into chunks before transcription
@@ -76,6 +77,14 @@ Expected output format (nothing else):
 
 Now transcribe the entire attached audio.
 """
+
+
+def _seconds_to_hms(total_seconds: float) -> str:
+    """Convert a float number of seconds to HH:MM:SS string."""
+    total = int(total_seconds)
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 def _get_mime_type(path: Path) -> str:
@@ -302,9 +311,86 @@ def _transcribe_single(client: genai.Client, audio_path: Path, prompt: str, retr
                 raise
 
 
+def _transcribe_assemblyai(audio_path: Path, language: str) -> str:
+    """Transcribe and diarize with AssemblyAI REST API (bypasses SDK enum limitations).
+
+    Uses speech_models=["universal-3-pro"] directly on the v2 API.
+    Returns a diarized transcript in [HH:MM:SS] Speaker N : text format.
+    """
+    if not ASSEMBLYAI_API_KEY:
+        raise RuntimeError("ASSEMBLYAI_API_KEY manquante. Renseigne-la dans .env")
+
+    try:
+        import httpx
+    except ImportError:
+        raise RuntimeError("httpx est nécessaire — installe-le avec : uv add httpx")
+
+    headers = {"authorization": ASSEMBLYAI_API_KEY, "content-type": "application/json"}
+    base = "https://api.assemblyai.com"
+
+    # 1. Upload the file
+    print(f"  [AssemblyAI] Upload de {audio_path.name}…")
+    with open(audio_path, "rb") as fh:
+        upload_resp = httpx.post(
+            f"{base}/v2/upload",
+            headers={"authorization": ASSEMBLYAI_API_KEY},
+            content=fh.read(),
+            timeout=300,
+        )
+    upload_resp.raise_for_status()
+    audio_url = upload_resp.json()["upload_url"]
+
+    # 2. Submit transcription job
+    lang_code = "fr" if language == "fr" else "en"
+    payload = {
+        "audio_url": audio_url,
+        "speaker_labels": True,
+        "language_code": lang_code,
+        "speech_models": ["universal-3-pro"],
+    }
+    submit_resp = httpx.post(f"{base}/v2/transcript", json=payload, headers=headers, timeout=60)
+    submit_resp.raise_for_status()
+    transcript_id = submit_resp.json()["id"]
+    print(f"  [AssemblyAI] Job soumis (id={transcript_id}), attente…")
+
+    # 3. Poll until complete
+    poll_url = f"{base}/v2/transcript/{transcript_id}"
+    while True:
+        poll = httpx.get(poll_url, headers=headers, timeout=60)
+        poll.raise_for_status()
+        data = poll.json()
+        status = data["status"]
+        if status == "completed":
+            break
+        if status == "error":
+            raise RuntimeError(f"Erreur AssemblyAI : {data.get('error')}")
+        print(f"  [AssemblyAI] Statut : {status}…")
+        time.sleep(4)
+
+    # 4. Format transcript
+    utterances = data.get("utterances") or []
+    if not utterances:
+        return data.get("text") or ""
+
+    letter_to_num: dict[str, int] = {}
+    counter = 1
+    lines: list[str] = []
+    sep = ":" if language != "fr" else " :"
+    for utt in utterances:
+        sp = utt["speaker"]
+        if sp not in letter_to_num:
+            letter_to_num[sp] = counter
+            counter += 1
+        ts = _seconds_to_hms(utt["start"] / 1000)
+        lines.append(f"[{ts}] Speaker {letter_to_num[sp]}{sep} {utt['text']}")
+
+    return "\n".join(lines)
+
+
 def transcribe_audio(
     audio_path: str | Path,
     language: str = "fr",
+    engine: str = "gemini",
 ) -> tuple[str, float]:
     """Transcribe and diarize an audio file using Gemini.
 
@@ -315,11 +401,22 @@ def transcribe_audio(
     ----------
     audio_path : path to an audio file (.mp3, .wav, .m4a, .ogg, .flac…)
     language   : 'fr' for French prompt, anything else for English prompt.
+    engine     : 'gemini' (default) or 'assemblyai'.
 
     Returns
     -------
     (transcript_text, elapsed_seconds)
     """
+    if engine == "assemblyai":
+        audio_path = Path(audio_path)
+        if not audio_path.exists():
+            raise FileNotFoundError(f"Fichier audio introuvable : {audio_path}")
+        t0 = time.perf_counter()
+        full_transcript = _transcribe_assemblyai(audio_path, language)
+        elapsed = time.perf_counter() - t0
+        print(f"\nTranscription AssemblyAI terminée en {elapsed:.1f}s")
+        return full_transcript, elapsed
+
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY manquante. Renseigne-la dans .env")
 

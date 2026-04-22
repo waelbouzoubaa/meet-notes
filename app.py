@@ -393,6 +393,16 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
+    # Moteur de transcription
+    st.markdown('<p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:0.3rem">Moteur de transcription</p>', unsafe_allow_html=True)
+    engine = st.selectbox(
+        "Moteur",
+        options=["gemini", "assemblyai"],
+        format_func=lambda x: "🤖  Gemini Flash" if x == "gemini" else "🎙  AssemblyAI",
+        label_visibility="collapsed",
+        key="engine_select",
+    )
+
     # Langue
     st.markdown('<p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:0.3rem">Langue</p>', unsafe_allow_html=True)
     language = st.selectbox("Langue", options=["fr", "en"],
@@ -482,7 +492,7 @@ phase_labels = {"upload": "Upload", "transcribing": "Transcription", "transcribe
 st.markdown(f"""
 <div class="hero">
   <div class="hero-left">
-    <div class="hero-eyebrow">Gemini 2.5 Flash · Ramery</div>
+    <div class="hero-eyebrow">{"AssemblyAI" if engine == "assemblyai" else "Gemini Flash"} · Ramery</div>
     <h1 class="hero-title">KaptNotes</h1>
     <p class="hero-sub">Transcription · Diarisation · Compte rendu automatisé</p>
   </div>
@@ -626,8 +636,9 @@ if ss.phase == "upload":
             f'&nbsp;·&nbsp;Template : <strong>{icon} {selected_template.replace("_"," ").title()}</strong></div>',
             unsafe_allow_html=True)
 
-        if not os.getenv("GEMINI_API_KEY"):
-            st.error("GEMINI_API_KEY manquante dans le fichier .env")
+        _required_key = "ASSEMBLYAI_API_KEY" if engine == "assemblyai" else "GEMINI_API_KEY"
+        if not os.getenv(_required_key):
+            st.error(f"{_required_key} manquante dans le fichier .env")
             st.stop()
 
         if st.button("▶  Lancer l'analyse", type="primary"):
@@ -642,6 +653,7 @@ if ss.phase == "upload":
             ss._pending_display  = display_name
             ss._extra_context    = extra_context
             ss._transcript_only  = transcript_only
+            ss._pending_engine   = engine
             ss.phase             = "transcribing"
             st.rerun()
             st.rerun()
@@ -655,9 +667,11 @@ elif ss.phase == "transcribing":
         tmp.write(ss._pending_bytes)
         tmp_path = Path(tmp.name)
     try:
+        _engine = getattr(ss, "_pending_engine", "gemini")
+        _engine_label = "AssemblyAI" if _engine == "assemblyai" else "Gemini Files API"
         with st.status("Transcription en cours…", expanded=True) as status:
-            st.write(f"Envoi de **{ss._pending_display}** vers Gemini Files API…")
-            transcript, elapsed = transcribe_audio(tmp_path, language)
+            st.write(f"Envoi de **{ss._pending_display}** vers {_engine_label}…")
+            transcript, elapsed = transcribe_audio(tmp_path, language, engine=_engine)
             status.update(label=f"Transcription terminée en {elapsed:.1f} s",
                 state="complete", expanded=False)
     except Exception as e:
@@ -710,15 +724,16 @@ elif ss.phase == "transcribed":
         st.caption("Renseignez les vrais noms pour personnaliser le rapport — optionnel.")
         if speakers:
             import pandas as pd
+            _id_col = "Identifiant"
             edited_df = st.data_editor(
-                pd.DataFrame({"Identifiant Gemini": speakers, "Vrai nom": [""] * len(speakers)}),
+                pd.DataFrame({_id_col: speakers, "Vrai nom": [""] * len(speakers)}),
                 column_config={
-                    "Identifiant Gemini": st.column_config.TextColumn(disabled=True),
+                    _id_col: st.column_config.TextColumn(disabled=True),
                     "Vrai nom": st.column_config.TextColumn(max_chars=50),
                 },
                 hide_index=True, use_container_width=True)
             speaker_map = {
-                row["Identifiant Gemini"]: row["Vrai nom"]
+                row[_id_col]: row["Vrai nom"]
                 for _, row in edited_df.iterrows()
                 if row["Vrai nom"].strip()
             }
