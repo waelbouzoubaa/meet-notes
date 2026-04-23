@@ -303,7 +303,31 @@ html, body, [class*="css"] {
 /* ── Hide Streamlit toolbar & menu ── */
 [data-testid="stToolbar"] { display: none !important; }
 #MainMenu { display: none !important; }
-header { visibility: hidden !important; }
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* ── Sidebar collapse button ── */
+[data-testid="stSidebarCollapseButton"] svg { fill: rgba(255,255,255,0.6) !important; }
+#kapt-sidebar-toggle {
+    position: fixed;
+    left: 0;
+    top: 8px;
+    z-index: 999999;
+    background: #193C6C;
+    color: white;
+    border: none;
+    border-radius: 0 6px 6px 0;
+    padding: 6px 10px;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 3px 0 10px rgba(0,0,0,0.5);
+    display: none;
+}
+body:has([data-testid="stSidebar"][aria-expanded="false"]) #kapt-sidebar-toggle {
+    display: block !important;
+}
 
 /* ── Divider ── */
 hr { border-color: rgba(255,255,255,0.07) !important; }
@@ -327,6 +351,25 @@ hr { border-color: rgba(255,255,255,0.07) !important; }
 }
 </style>
 """, unsafe_allow_html=True)
+
+st.markdown('<button id="kapt-sidebar-toggle">☰</button>', unsafe_allow_html=True)
+
+import streamlit.components.v1 as _components
+_components.html("""
+<script>
+var doc = window.parent.document;
+function _kaptAttach() {
+    var btn = doc.getElementById('kapt-sidebar-toggle');
+    if (!btn) { setTimeout(_kaptAttach, 300); return; }
+    btn.addEventListener('click', function() {
+        var d = doc.querySelector('[data-testid="stSidebarCollapseButton"]');
+        var b = d && d.querySelector('button');
+        if (b) b.click();
+    });
+}
+_kaptAttach();
+</script>
+""", height=0)
 
 # ── Session state ──────────────────────────────────────────────────────────────
 defaults = {

@@ -55,9 +55,13 @@ def _strip_md_inline(text: str) -> str:
     text = re.sub(r"\*{1,2}(.+?)\*{1,2}", r"\1", text)
     text = re.sub(r"`(.+?)`", r"\1", text)
     text = re.sub(r"_{1,2}(.+?)_{1,2}", r"\1", text)
-    # Seuls les caractères vraiment non imprimables sont remplacés
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
     return text.strip()
+
+
+def _strip_heading_number(text: str) -> str:
+    """Remove leading numbered prefixes like '7. ' or '3.2 ' from headings."""
+    return re.sub(r"^\d+(\.\d+)*\.?\s+", "", text).strip()
 
 
 # ── Classe PDF ──────────────────────────────────────────────────────────────
@@ -127,7 +131,7 @@ def _render_markdown(pdf: RameryPDF, markdown: str) -> None:
                 pdf.ln(3)
                 pdf.set_font("DejaVu", "B", 14)
                 pdf.set_text_color(*BLUE)
-                pdf.multi_cell(W, 8, _strip_md_inline(line[2:]))
+                pdf.multi_cell(W, 8, _strip_md_inline(_strip_heading_number(line[2:])))
                 pdf.set_fill_color(*RED)
                 pdf.rect(18, pdf.get_y(), W, 0.7, "F")
                 pdf.ln(4)
@@ -137,19 +141,23 @@ def _render_markdown(pdf: RameryPDF, markdown: str) -> None:
                 in_table  = False
                 row_index = 0
                 pdf.ln(3)
-                # Assez de place pour le bloc H2 ? (hauteur ~9mm)
-                if pdf.get_y() > 260:
+                title_text = _strip_md_inline(_strip_heading_number(line[3:]))
+                pdf.set_font("DejaVu", "B", 10)
+                # Calculate block height from text width
+                txt_w   = pdf.get_string_width(title_text)
+                n_lines = max(1, -(-int(txt_w) // 162))  # ceiling division
+                block_h = max(8, n_lines * 6.5 + 2)
+                if pdf.get_y() + block_h > 262:
                     pdf.add_page()
                 y = pdf.get_y()
                 pdf.set_fill_color(*BLUE)
-                pdf.rect(18, y, 2, 8, "F")
+                pdf.rect(18, y, 2, block_h, "F")
                 pdf.set_fill_color(*LIGHT)
-                pdf.rect(20, y, 172, 8, "F")
-                pdf.set_font("DejaVu", "B", 10)
+                pdf.rect(20, y, 172, block_h, "F")
                 pdf.set_text_color(*BLUE)
                 pdf.set_xy(22, y + 1.5)
-                pdf.cell(168, 6, _strip_md_inline(line[3:]))
-                pdf.set_xy(18, y + 9)
+                pdf.multi_cell(166, 6.5, title_text)
+                pdf.set_xy(18, max(pdf.get_y(), y + block_h) + 1)
                 pdf.ln(1)
 
             # H3
@@ -157,7 +165,7 @@ def _render_markdown(pdf: RameryPDF, markdown: str) -> None:
                 pdf.ln(2)
                 pdf.set_font("DejaVu", "B", 9)
                 pdf.set_text_color(*DARK)
-                pdf.multi_cell(W, 6, _strip_md_inline(line[4:]))
+                pdf.multi_cell(W, 6, _strip_md_inline(_strip_heading_number(line[4:])))
                 pdf.ln(1)
 
             # Tableau
