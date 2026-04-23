@@ -436,15 +436,17 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-    # Moteur de transcription
-    st.markdown('<p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:0.3rem">Moteur de transcription</p>', unsafe_allow_html=True)
-    engine = st.selectbox(
-        "Moteur",
-        options=["gemini", "assemblyai"],
-        format_func=lambda x: "🤖  Gemini Flash" if x == "gemini" else "🎙  AssemblyAI",
-        label_visibility="collapsed",
-        key="engine_select",
-    )
+    # Moteur de transcription — AssemblyAI par défaut (sélecteur masqué)
+    engine = "assemblyai"
+    # Pour réactiver le choix, décommente le bloc ci-dessous :
+    # st.markdown('<p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:0.3rem">Moteur de transcription</p>', unsafe_allow_html=True)
+    # engine = st.selectbox(
+    #     "Moteur",
+    #     options=["gemini", "assemblyai"],
+    #     format_func=lambda x: "🤖  Gemini Flash" if x == "gemini" else "🎙  AssemblyAI",
+    #     label_visibility="collapsed",
+    #     key="engine_select",
+    # )
 
     # Langue
     st.markdown('<p style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:0.3rem">Langue</p>', unsafe_allow_html=True)
