@@ -763,6 +763,28 @@ elif ss.phase == "transcribed":
     extra_context   = getattr(ss, "_extra_context", "")
     transcript_only = getattr(ss, "_transcript_only", False)
 
+    # Auto-download transcript .txt on first render of this phase
+    if ss.get("_transcript_dl_stem") != ss.audio_stem:
+        import base64 as _b64
+        import streamlit.components.v1 as _cv1
+        _txt_b64 = _b64.b64encode(ss.transcript_raw.encode("utf-8")).decode()
+        _txt_filename = f"{ss.audio_stem}_transcript.txt"
+        _cv1.html(f"""
+<script>
+(function() {{
+    var doc = window.parent.document;
+    var a = doc.createElement('a');
+    a.href = 'data:text/plain;charset=utf-8;base64,{_txt_b64}';
+    a.download = '{_txt_filename}';
+    a.style.display = 'none';
+    doc.body.appendChild(a);
+    a.click();
+    setTimeout(function() {{ doc.body.removeChild(a); }}, 500);
+}})();
+</script>
+""", height=0)
+        ss["_transcript_dl_stem"] = ss.audio_stem
+
     speakers   = extract_speakers(ss.transcript_raw)
     word_count = len(ss.transcript_raw.split())
     icon, _    = tmeta(selected_template)
