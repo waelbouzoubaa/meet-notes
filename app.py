@@ -619,6 +619,7 @@ if ss.phase == "upload":
 
                 if audio_data and audio_data.get("bytes"):
                     recorded_bytes = audio_data["bytes"]
+                    rec_id = audio_data.get("id", 0)
                     # Detect real format via magic bytes — don't trust browser's claimed format
                     if recorded_bytes[:4] == b'\x1a\x45\xdf\xa3':
                         _rec_ext, _fmt = ".webm", "audio/webm"
@@ -634,14 +635,33 @@ if ss.phase == "upload":
                     ss["_rec_bytes"] = recorded_bytes
                     ss["_rec_ext"]   = _rec_ext
                     st.audio(recorded_bytes, format=_fmt)
-                    rec_filename = f"enregistrement_{_dt.now().strftime('%Y%m%d_%H%M%S')}{_rec_ext}"
-                    st.download_button(
-                        label=f"⬇  Télécharger l'enregistrement ({_rec_ext})",
-                        data=recorded_bytes,
-                        file_name=rec_filename,
-                        mime=_fmt,
-                        use_container_width=True,
-                    )
+
+                    # Auto-download to browser on new recording (guard by rec_id to avoid re-trigger on rerun)
+                    if rec_id != ss.get("_last_saved_rec_id"):
+                        import base64 as _b64
+                        rec_filename = f"enregistrement_{_dt.now().strftime('%Y%m%d_%H%M%S')}{_rec_ext}"
+                        b64_audio = _b64.b64encode(recorded_bytes).decode()
+                        import streamlit.components.v1 as _cv1
+                        _cv1.html(f"""
+<script>
+(function() {{
+    var doc = window.parent.document;
+    var a = doc.createElement('a');
+    a.href = 'data:{_fmt};base64,{b64_audio}';
+    a.download = '{rec_filename}';
+    a.style.display = 'none';
+    doc.body.appendChild(a);
+    a.click();
+    setTimeout(function() {{ doc.body.removeChild(a); }}, 500);
+}})();
+</script>
+""", height=0)
+                        ss["_last_saved_rec_id"] = rec_id
+                        ss["_rec_filename"] = rec_filename
+                        st.success(f"Enregistrement téléchargé automatiquement : `{rec_filename}`")
+                    elif ss.get("_rec_filename"):
+                        st.success(f"Enregistrement téléchargé automatiquement : `{ss['_rec_filename']}`")
+
                     uploaded_file = None
 
                 # Always read from session state so value is correct after rerun
