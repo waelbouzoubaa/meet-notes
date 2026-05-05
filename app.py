@@ -658,9 +658,21 @@ if ss.phase == "upload":
 """, height=0)
                         ss["_last_saved_rec_id"] = rec_id
                         ss["_rec_filename"] = rec_filename
-                        st.success(f"Enregistrement téléchargé automatiquement : `{rec_filename}`")
+                        ss["_rec_fmt"] = _fmt
+                        st.success(f"Enregistrement sauvegardé automatiquement : `{rec_filename}`")
                     elif ss.get("_rec_filename"):
-                        st.success(f"Enregistrement téléchargé automatiquement : `{ss['_rec_filename']}`")
+                        st.success(f"Enregistrement sauvegardé automatiquement : `{ss['_rec_filename']}`")
+
+                    # Bouton de téléchargement explicite (fallback si auto-download bloqué)
+                    _dl_fname = ss.get("_rec_filename", f"enregistrement{_rec_ext}")
+                    _dl_fmt   = ss.get("_rec_fmt", _fmt)
+                    st.download_button(
+                        label=f"⬇  Télécharger l'enregistrement ({_rec_ext})",
+                        data=recorded_bytes,
+                        file_name=_dl_fname,
+                        mime=_dl_fmt,
+                        use_container_width=True,
+                    )
 
                     uploaded_file = None
 
