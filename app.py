@@ -598,9 +598,9 @@ if ss.phase == "upload":
 
         with tab_upload:
             uploaded_file = st.file_uploader("audio",
-                type=["mp3", "wav", "m4a", "ogg", "flac", "aac", "webm"],
+                type=["mp3", "wav", "m4a", "mp4", "ogg", "flac", "aac", "webm"],
                 label_visibility="collapsed",
-                help="Formats acceptés : mp3 · wav · m4a · ogg · flac · aac · webm")
+                help="Formats acceptés : mp3 · wav · m4a · mp4 · ogg · flac · aac · webm")
             if uploaded_file:
                 ss.pop("_rec_bytes", None)
                 ss.pop("_rec_ext", None)
