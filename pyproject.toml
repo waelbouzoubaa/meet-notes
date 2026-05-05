@@ -14,4 +14,6 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "streamlit>=1.40.0",
     "streamlit-mic-recorder>=0.0.8",
+    "pypdf>=4.0.0",
+    "python-pptx>=0.6.23",
 ]

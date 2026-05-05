@@ -696,6 +696,13 @@ if ss.phase == "upload":
         extra_context = st.text_area("Contexte additionnel",
             placeholder="Ex : chantier Bordeaux, focus retards lot gros œuvre…",
             height=88, label_visibility="visible")
+        uploaded_docs = st.file_uploader(
+            "Documents présentés en séance",
+            type=["pdf", "pptx", "docx", "txt"],
+            accept_multiple_files=True,
+            help="PDF · PPTX · DOCX · TXT — texte et images analysés par Gemini",
+            label_visibility="visible",
+        )
         transcript_only = st.checkbox("Transcription uniquement (sans rapport)", value=False)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -736,6 +743,7 @@ if ss.phase == "upload":
             ss._extra_context    = extra_context
             ss._transcript_only  = transcript_only
             ss._pending_engine   = engine
+            ss._pending_docs     = [(d.name, bytes(d.getbuffer())) for d in (uploaded_docs or [])]
             ss.phase             = "transcribing"
             st.rerun()
             st.rerun()
@@ -885,7 +893,17 @@ elif ss.phase == "reporting":
     try:
         with st.status("Génération du rapport…", expanded=True) as status:
             st.write(f"Analyse avec le template **{ss._pending_template.replace('_',' ').title()}**…")
-            report = summarize_transcript(ss.transcript_named, system_prompt=system_prompt)
+
+            # Build document parts if any docs were uploaded
+            doc_parts = []
+            pending_docs = getattr(ss, "_pending_docs", [])
+            if pending_docs:
+                from doc_extract import build_doc_parts
+                for doc_name, doc_bytes in pending_docs:
+                    st.write(f"Analyse du document **{doc_name}**…")
+                    doc_parts.extend(build_doc_parts(doc_bytes, doc_name))
+
+            report = summarize_transcript(ss.transcript_named, system_prompt=system_prompt, doc_parts=doc_parts or None)
             status.update(label="Rapport généré avec succès !", state="complete", expanded=False)
     except Exception as e:
         st.error(f"Erreur génération : {e}")

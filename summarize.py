@@ -55,26 +55,38 @@ Règles :
 """
 
 
-def summarize_transcript(transcript: str, system_prompt: str | None = None) -> str:
-    """Send a diarized transcript to Gemini and return the Markdown report.
+def summarize_transcript(
+    transcript: str,
+    system_prompt: str | None = None,
+    doc_parts: list | None = None,
+) -> str:
+    """Send a diarized transcript (+ optional documents) to Gemini and return the Markdown report.
 
     Parameters
     ----------
-    transcript : the plain-text diarized transcript
-    system_prompt : override the default SYSTEM_PROMPT (e.g. a custom template)
+    transcript   : the plain-text diarized transcript
+    system_prompt: override the default SYSTEM_PROMPT (e.g. a custom template)
+    doc_parts    : list of google.genai types.Part objects (text/images/PDF URIs)
+                   built by doc_extract.build_doc_parts()
     """
     if not GEMINI_API_KEY:
-        raise RuntimeError(
-            "GEMINI_API_KEY manquante. Renseigne-la dans .env"
-        )
+        raise RuntimeError("GEMINI_API_KEY manquante. Renseigne-la dans .env")
 
     client = genai.Client(api_key=GEMINI_API_KEY)
-
     prompt = system_prompt if system_prompt is not None else SYSTEM_PROMPT
+
+    parts: list = [types.Part.from_text(f"Voici le transcript de réunion à résumer :\n\n{transcript}")]
+
+    if doc_parts:
+        parts.append(types.Part.from_text(
+            "\n\n---\n\nVoici les documents présentés en séance. "
+            "Utilise-les pour enrichir l'analyse et le rapport :"
+        ))
+        parts.extend(doc_parts)
 
     response = client.models.generate_content(
         model=MODEL,
-        contents=f"Voici le transcript de réunion à résumer :\n\n{transcript}",
+        contents=[types.Content(role="user", parts=parts)],
         config=types.GenerateContentConfig(
             system_instruction=prompt,
             temperature=0.3,
