@@ -58,7 +58,7 @@ def _extract_pptx(file_bytes: bytes, filename: str) -> list[types.Part]:
 
     if slide_texts:
         header = f"Document : {filename}\n\n" + "\n\n".join(slide_texts)
-        parts.insert(0, types.Part.from_text(header))
+        parts.insert(0, types.Part.from_text(text=header))
 
     return parts
 
@@ -70,7 +70,7 @@ def _extract_docx(file_bytes: bytes, filename: str) -> list[types.Part]:
     text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
     if not text:
         return []
-    return [types.Part.from_text(f"Document : {filename}\n\n{text}")]
+    return [types.Part.from_text(text=f"Document : {filename}\n\n{text}")]
 
 
 def _extract_txt(file_bytes: bytes, filename: str) -> list[types.Part]:
@@ -80,7 +80,7 @@ def _extract_txt(file_bytes: bytes, filename: str) -> list[types.Part]:
         text = file_bytes.decode("latin-1")
     if not text.strip():
         return []
-    return [types.Part.from_text(f"Document : {filename}\n\n{text}")]
+    return [types.Part.from_text(text=f"Document : {filename}\n\n{text}")]
 
 
 def _upload_pdf(file_bytes: bytes, filename: str) -> list[types.Part]:
@@ -99,7 +99,7 @@ def _upload_pdf(file_bytes: bytes, filename: str) -> list[types.Part]:
         if uploaded.state.name == "FAILED":
             raise RuntimeError(f"Échec upload PDF Gemini : {filename}")
         return [
-            types.Part.from_text(f"Document PDF : {filename}"),
+            types.Part.from_text(text=f"Document PDF : {filename}"),
             types.Part.from_uri(file_uri=uploaded.uri, mime_type="application/pdf"),
         ]
     finally:
