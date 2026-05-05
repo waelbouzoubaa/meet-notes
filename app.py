@@ -528,8 +528,13 @@ with st.sidebar:
 
     st.divider()
 
+    if ss.phase == "reported":
+        st.button("🔄  Relancer avec un autre template",
+            on_click=lambda: ss.update({"phase": "transcribed"}),
+            use_container_width=True)
     if ss.phase != "upload":
-        st.button("↩  Nouvelle analyse", on_click=lambda: ss.update(defaults))
+        st.button("↩  Nouvelle analyse", on_click=lambda: ss.update(defaults),
+            use_container_width=True)
 
 
 # ── Hero ───────────────────────────────────────────────────────────────────────
@@ -899,6 +904,10 @@ elif ss.phase == "reported":
 
     dest = f"copié dans `{onedrive_path}`" if onedrive_path.strip() else "sauvegardé localement"
     st.success(f"Analyse terminée pour **{ss.audio_stem}** — {dest}")
+
+    if st.button("🔄  Relancer avec un autre template", key="rerun_template_btn"):
+        ss.phase = "transcribed"
+        st.rerun()
 
     if ss.report:
         tab_report, tab_transcript = st.tabs(["📄  Rapport", "📝  Transcript"])
