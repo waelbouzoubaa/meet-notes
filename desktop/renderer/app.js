@@ -24,7 +24,6 @@ const state = {
 (async () => {
   state.apiUrl = await window.kaptnotes.getApiUrl();
   await loadTemplates();
-  await loadAudioSources();
   bindEvents();
 })();
 
@@ -49,18 +48,6 @@ async function loadTemplates() {
   }
 }
 
-// ── Audio sources (system audio) ──────────────────────────────────────────────
-async function loadAudioSources() {
-  try {
-    const sources = await window.kaptnotes.getAudioSources();
-    const sel = document.getElementById('audio-source');
-    sel.innerHTML = sources.map(s =>
-      `<option value="${s.id}">${s.name}</option>`
-    ).join('');
-  } catch (e) {
-    console.error('Audio sources error', e);
-  }
-}
 
 // ── Events ────────────────────────────────────────────────────────────────────
 function bindEvents() {
@@ -168,17 +155,16 @@ async function toggleRecording() {
 }
 
 async function startRecording() {
-  await window.kaptnotes.requestMicPermission();
+  // Auto-select primary screen source — no user interaction needed
+  const source = await window.kaptnotes.getPrimarySource();
+  if (!source) {
+    document.getElementById('record-info').textContent = '❌ Impossible de détecter la source audio système.';
+    return;
+  }
 
-  const sourceId = document.getElementById('audio-source').value;
   const constraints = {
-    audio: {
-      mandatory: {
-        chromeMediaSource: 'desktop',
-        chromeMediaSourceId: sourceId,
-      }
-    },
-    video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sourceId } }
+    audio: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: source.id } },
+    video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: source.id } },
   };
 
   try {

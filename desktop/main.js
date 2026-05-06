@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, systemPreferences, dialog } = require('electron');
 const path = require('path');
+const Store = require('electron-store');
 
-// VPS API endpoint — change this to your VPS URL before building
+const store = new Store();
 const API_URL = process.env.KAPTNOTES_API_URL || 'http://localhost:8000';
 
 let mainWindow;
@@ -12,17 +13,43 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
-    icon: path.join(__dirname, 'assets', 'icon.png'),
     backgroundColor: '#0A1628',
+    show: false,
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.once('ready-to-show', async () => {
+    mainWindow.show();
+    // Ask for permissions on first launch
+    if (!store.get('permissions-granted')) {
+      await askPermissions();
+    }
+  });
+}
+
+async function askPermissions() {
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'KaptNotes — Autorisation requise',
+    message: 'KaptNotes a besoin de vos autorisations',
+    detail: 'Pour fonctionner, KaptNotes doit :\n\n• Enregistrer votre microphone\n• Enregistrer l\'audio de votre ordinateur (réunions Teams, Meet…)\n\nCes enregistrements ne sont jamais envoyés sans votre action. Vous pouvez révoquer ces droits à tout moment.',
+    buttons: ['Autoriser', 'Annuler'],
+    defaultId: 0,
+    cancelId: 1,
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+  });
+
+  if (response === 0) {
+    if (process.platform === 'darwin') {
+      await systemPreferences.askForMediaAccess('microphone');
+    }
+    store.set('permissions-granted', true);
+  }
 }
 
 app.whenReady().then(() => {
@@ -36,18 +63,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// ── Audio capture — system audio + mic ────────────────────────────────────────
-ipcMain.handle('get-audio-sources', async () => {
-  const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
-  return sources.map(s => ({ id: s.id, name: s.name, thumbnail: s.thumbnail.toDataURL() }));
+// ── Auto-select primary screen source ─────────────────────────────────────────
+ipcMain.handle('get-primary-source', async () => {
+  const sources = await desktopCapturer.getSources({ types: ['screen'] });
+  return sources[0] ? { id: sources[0].id, name: sources[0].name } : null;
 });
 
 ipcMain.handle('get-api-url', () => API_URL);
-
-// Request mic permission on macOS
-ipcMain.handle('request-mic-permission', async () => {
-  if (process.platform === 'darwin') {
-    return await systemPreferences.askForMediaAccess('microphone');
-  }
-  return true;
-});

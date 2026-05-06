@@ -9,6 +9,7 @@
     "build:mac": "electron-builder --mac"
   },
   "dependencies": {
+    "electron-store": "^11.0.2",
     "electron-updater": "^6.1.7"
   },
   "devDependencies": {
