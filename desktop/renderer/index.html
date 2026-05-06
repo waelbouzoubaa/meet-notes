@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KaptNotes — Ramery</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">K</div>
+      <div>
+        <div class="logo-title">KaptNotes</div>
+        <div class="logo-sub">Ramery</div>
+      </div>
+    </div>
+    <div class="sidebar-bar"></div>
+
+    <label class="field-label">Langue</label>
+    <select id="language" class="select">
+      <option value="fr">🇫🇷 Français</option>
+      <option value="en">🇬🇧 English</option>
+    </select>
+
+    <label class="field-label" style="margin-top:1rem">Template de rapport</label>
+    <select id="template" class="select"></select>
+    <div id="template-desc" class="template-desc"></div>
+
+    <div style="flex:1"></div>
+    <button id="btn-reset" class="btn-ghost" style="display:none">↩ Nouvelle analyse</button>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div>
+        <div class="hero-eyebrow">AssemblyAI · Ramery</div>
+        <h1 class="hero-title">KaptNotes</h1>
+        <p class="hero-sub">Transcription · Diarisation · Compte rendu automatisé</p>
+      </div>
+      <div class="hero-badge">
+        <span id="phase-label" class="badge-val">Upload</span>
+        <span class="badge-lbl">Étape en cours</span>
+      </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="stepper" id="stepper">
+      <div class="step active" data-step="0"><div class="step-dot">📁</div><span>Upload</span></div>
+      <div class="step-line"></div>
+      <div class="step pending" data-step="1"><div class="step-dot">🎙</div><span>Transcription</span></div>
+      <div class="step-line"></div>
+      <div class="step pending" data-step="2"><div class="step-dot">👥</div><span>Participants</span></div>
+      <div class="step-line"></div>
+      <div class="step pending" data-step="3"><div class="step-dot">📄</div><span>Rapport</span></div>
+    </div>
+
+    <!-- ── Phase 0 : Upload ── -->
+    <div id="phase-upload" class="phase">
+      <div class="two-col">
+
+        <div class="card">
+          <div class="card-label">Source audio</div>
+          <div class="tabs">
+            <button class="tab active" data-tab="import">📁 Importer</button>
+            <button class="tab" data-tab="record">🎙 Enregistrer</button>
+          </div>
+
+          <!-- Tab import -->
+          <div id="tab-import" class="tab-content">
+            <div class="dropzone" id="dropzone">
+              <div class="drop-icon">🎵</div>
+              <div class="drop-text">Glissez un fichier audio ici</div>
+              <div class="drop-sub">mp3 · wav · m4a · mp4 · ogg · flac · aac · webm</div>
+              <input type="file" id="file-input" accept=".mp3,.wav,.m4a,.mp4,.ogg,.flac,.aac,.webm" hidden />
+              <button class="btn-ghost" onclick="document.getElementById('file-input').click()">Parcourir</button>
+            </div>
+            <div id="file-info" class="file-info" style="display:none"></div>
+          </div>
+
+          <!-- Tab record -->
+          <div id="tab-record" class="tab-content" style="display:none">
+            <div class="record-warning">
+              <strong>🎙 Capture audio complète (système + micro)</strong><br>
+              L'app capture le son de votre PC <em>et</em> votre microphone — les voix distantes Teams/Meet sont incluses.
+            </div>
+            <div style="margin-bottom:0.8rem">
+              <label class="field-label">Source système</label>
+              <select id="audio-source" class="select"></select>
+            </div>
+            <div class="record-controls">
+              <button id="btn-record" class="btn-record">🔴 Démarrer</button>
+              <div id="record-timer" class="record-timer" style="display:none">00:00</div>
+            </div>
+            <div id="record-info" style="display:none;margin-top:0.5rem;font-size:0.82rem;color:#6BAEF5"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Options</div>
+          <label class="field-label">Contexte additionnel</label>
+          <textarea id="extra-context" class="textarea" rows="3"
+            placeholder="Ex : chantier Bordeaux, focus retards lot gros œuvre…"></textarea>
+
+          <label class="field-label" style="margin-top:0.8rem">Documents de séance</label>
+          <div class="dropzone mini" id="doc-dropzone">
+            <input type="file" id="doc-input" accept=".pdf,.pptx,.docx,.txt" multiple hidden />
+            <span style="font-size:0.83rem;color:#64748B">PDF · PPTX · DOCX · TXT</span>
+            <button class="btn-ghost small" onclick="document.getElementById('doc-input').click()">Ajouter</button>
+          </div>
+          <div id="doc-list" class="doc-list"></div>
+
+          <label class="checkbox-row" style="margin-top:0.8rem">
+            <input type="checkbox" id="transcript-only" />
+            <span>Transcription uniquement (sans rapport)</span>
+          </label>
+        </div>
+      </div>
+
+      <button id="btn-launch" class="btn-primary" disabled>▶ Lancer l'analyse</button>
+    </div>
+
+    <!-- ── Phase 1 : Transcription ── -->
+    <div id="phase-transcribing" class="phase" style="display:none">
+      <div class="status-card">
+        <div class="spinner"></div>
+        <div id="transcribing-label">Envoi du fichier audio…</div>
+      </div>
+    </div>
+
+    <!-- ── Phase 2 : Participants ── -->
+    <div id="phase-transcribed" class="phase" style="display:none">
+      <div class="metrics" id="metrics"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-label">Participants</div>
+          <p style="font-size:0.82rem;color:#64748B;margin-bottom:0.8rem">Renseignez les vrais noms — optionnel.</p>
+          <div id="speakers-table"></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Transcript brut</div>
+          <textarea id="transcript-preview" class="textarea" rows="12" readonly></textarea>
+        </div>
+      </div>
+      <button id="btn-generate" class="btn-primary">▶ Générer le rapport</button>
+    </div>
+
+    <!-- ── Phase 3 : Rapport ── -->
+    <div id="phase-reporting" class="phase" style="display:none">
+      <div class="status-card">
+        <div class="spinner"></div>
+        <div>Génération du rapport en cours…</div>
+      </div>
+    </div>
+
+    <!-- ── Phase 4 : Résultats ── -->
+    <div id="phase-reported" class="phase" style="display:none">
+      <div class="success-banner" id="success-banner"></div>
+      <div class="result-tabs">
+        <button class="tab active" data-rtab="report">📄 Rapport</button>
+        <button class="tab" data-rtab="transcript">📝 Transcript</button>
+      </div>
+      <div id="rtab-report">
+        <div id="report-content" class="report-body"></div>
+        <div class="download-row">
+          <button class="btn-download" id="dl-md">⬇ Télécharger (.md)</button>
+          <button class="btn-download primary" id="dl-pdf">⬇ Télécharger (.pdf)</button>
+        </div>
+      </div>
+      <div id="rtab-transcript" style="display:none">
+        <textarea id="transcript-final" class="textarea" rows="20" readonly></textarea>
+        <button class="btn-download" id="dl-txt">⬇ Télécharger (.txt)</button>
+      </div>
+      <button id="btn-rerun" class="btn-ghost" style="margin-top:1rem">🔄 Relancer avec un autre template</button>
+    </div>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
