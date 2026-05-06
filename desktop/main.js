@@ -1,9 +1,20 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, systemPreferences, dialog } = require('electron');
 const path = require('path');
-const Store = require('electron-store');
+const fs = require('fs');
 
-const store = new Store();
 const API_URL = process.env.KAPTNOTES_API_URL || 'http://localhost:8000';
+
+function getConfigPath() {
+  return path.join(app.getPath('userData'), 'kaptnotes-config.json');
+}
+function getConfig() {
+  try { return JSON.parse(fs.readFileSync(getConfigPath(), 'utf8')); } catch { return {}; }
+}
+function setConfig(key, value) {
+  const cfg = getConfig();
+  cfg[key] = value;
+  fs.writeFileSync(getConfigPath(), JSON.stringify(cfg));
+}
 
 let mainWindow;
 
@@ -26,7 +37,7 @@ function createWindow() {
   mainWindow.once('ready-to-show', async () => {
     mainWindow.show();
     // Ask for permissions on first launch
-    if (!store.get('permissions-granted')) {
+    if (!getConfig()['permissions-granted']) {
       await askPermissions();
     }
   });
@@ -41,14 +52,13 @@ async function askPermissions() {
     buttons: ['Autoriser', 'Annuler'],
     defaultId: 0,
     cancelId: 1,
-    icon: path.join(__dirname, 'assets', 'icon.png'),
   });
 
   if (response === 0) {
     if (process.platform === 'darwin') {
       await systemPreferences.askForMediaAccess('microphone');
     }
-    store.set('permissions-granted', true);
+    setConfig('permissions-granted', true);
   }
 }
 
