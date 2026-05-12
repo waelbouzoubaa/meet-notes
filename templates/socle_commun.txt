@@ -79,10 +79,18 @@ Format de sortie — OBLIGATOIRE, utiliser exactement ces titres Markdown :
 [Structurés par thème avec ### pour chaque sous-thème]
 
 ## Décisions prises
-[Liste numérotée]
+[Groupées par responsable. Format :
+*   **Prénom :**
+    *   Décision 1
+    *   Décision 2
+Si une seule décision pour la personne, une seule sous-bullet suffit.]
 
 ## Actions à mener
-[Bullets : une action par ligne, formulée ainsi → **[Responsable] :** action à réaliser *(échéance si mentionnée)*]
+[Groupées par responsable. Format :
+*   **Prénom :**
+    *   Action 1 *(échéance si mentionnée)*
+    *   Action 2
+Si une seule action pour la personne, une seule sous-bullet suffit.]
 
 ## Points de vigilance / risques
 [Bullets]
