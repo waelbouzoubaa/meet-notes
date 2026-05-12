@@ -194,22 +194,37 @@ def _render_markdown(pdf: RameryPDF, markdown: str) -> None:
                     pdf.ln(5.5)
                 row_index += 1
 
-            # Puce
-            elif line.startswith(("- ", "* ", "+ ")):
+            # Sous-bullet (indentation dans raw, vérifié avant le bullet principal)
+            elif re.match(r'^\s+[-*+]\s+', raw):
                 in_table = False
+                text = re.sub(r'^\s+[-*+]\s+', '', raw)
+                pdf.set_font("DejaVu", "", 8.5)
+                if pdf.get_y() + 5 > 275:
+                    pdf.add_page()
+                pdf.set_text_color(*DARK)
+                pdf.set_fill_color(*DARK)
+                pdf.ellipse(24, pdf.get_y() + 2, 1.2, 1.2, "F")
+                pdf.set_left_margin(27)
+                pdf.set_x(27)
+                pdf.multi_cell(161, 5, _strip_md_inline(text))
+                pdf.set_left_margin(18)
+                pdf.set_x(18)
+
+            # Bullet principal
+            elif re.match(r'^[-*+]\s+', raw):
+                in_table = False
+                text = re.sub(r'^[-*+]\s+', '', raw)
                 pdf.set_font("DejaVu", "", 9)
+                if pdf.get_y() + 5.5 > 275:
+                    pdf.add_page()
                 pdf.set_text_color(*DARK)
                 pdf.set_fill_color(*RED)
                 pdf.ellipse(19, pdf.get_y() + 2, 1.5, 1.5, "F")
+                pdf.set_left_margin(22)
                 pdf.set_x(22)
-                pdf.multi_cell(170, 5.5, _strip_md_inline(line[2:]))
-
-            # Puce indentée
-            elif line.startswith(("  - ", "  * ")):
-                pdf.set_font("DejaVu", "", 8.5)
-                pdf.set_text_color(*MUTED)
-                pdf.set_x(26)
-                pdf.multi_cell(164, 5, "- " + _strip_md_inline(line[4:]))
+                pdf.multi_cell(168, 5.5, _strip_md_inline(text))
+                pdf.set_left_margin(18)
+                pdf.set_x(18)
 
             # Ligne vide
             elif line == "":
@@ -224,6 +239,47 @@ def _render_markdown(pdf: RameryPDF, markdown: str) -> None:
                 pdf.set_line_width(0.3)
                 pdf.line(18, pdf.get_y(), 192, pdf.get_y())
                 pdf.ln(3)
+
+            # Ligne entièrement en gras → style H2 bleu (ex: **Synthèse exécutive :**)
+            elif re.match(r'^\*\*[^*]+\*\*\s*:?\s*$', line):
+                in_table  = False
+                row_index = 0
+                pdf.ln(3)
+                title_text = _strip_md_inline(line)
+                pdf.set_font("DejaVu", "B", 10)
+                txt_w   = pdf.get_string_width(title_text)
+                n_lines = max(1, -(-int(txt_w) // 162))
+                block_h = max(8, n_lines * 6.5 + 2)
+                if pdf.get_y() + block_h > 262:
+                    pdf.add_page()
+                y = pdf.get_y()
+                pdf.set_fill_color(*BLUE)
+                pdf.rect(18, y, 2, block_h, "F")
+                pdf.set_fill_color(*LIGHT)
+                pdf.rect(20, y, 172, block_h, "F")
+                pdf.set_text_color(*BLUE)
+                pdf.set_xy(22, y + 1.5)
+                pdf.multi_cell(166, 6.5, title_text)
+                pdf.set_xy(18, max(pdf.get_y(), y + block_h) + 1)
+                pdf.ln(1)
+
+            # Texte normal avec gras inline (ex: **Date :** 21 avril)
+            elif '**' in line:
+                in_table = False
+                pdf.set_text_color(*DARK)
+                for part in re.split(r'(\*\*[^*]+\*\*)', line):
+                    clean = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', part)
+                    if clean.startswith('**') and clean.endswith('**'):
+                        pdf.set_font("DejaVu", "B", 9)
+                        pdf.write(5.5, clean[2:-2])
+                    else:
+                        # Retirer uniquement les marqueurs markdown, PAS les espaces
+                        clean = re.sub(r'\*{1,2}(.+?)\*{1,2}', r'\1', clean)
+                        clean = re.sub(r'`(.+?)`', r'\1', clean)
+                        clean = re.sub(r'_{1,2}(.+?)_{1,2}', r'\1', clean)
+                        pdf.set_font("DejaVu", "", 9)
+                        pdf.write(5.5, clean)
+                pdf.ln(5.5)
 
             # Texte normal
             else:

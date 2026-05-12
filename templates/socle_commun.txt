@@ -57,27 +57,47 @@ Traitement :
 
 ---
 
-Format de sortie :
+Format de sortie — OBLIGATOIRE, utiliser exactement ces titres Markdown :
 
-1. Titre de la réunion
-2. Date / durée / participants
-3. Type de réunion métier
-4. Type de réunion (remote / présentiel / hybride)
-5. Contexte et objectif
-6. Synthèse exécutive en 5 lignes max
-7. Sujets abordés (structurés par thème)
-8. Décisions prises
-9. Actions à mener (responsable, échéance si connue)
-10. Points de vigilance / risques
-11. Questions ouvertes
-12. Points à confirmer (si incertitudes)
-13. Annexe : verbatim utile uniquement si nécessaire
+# [Titre de la réunion]
+
+**Date :** [date extraite de la transcription — si l'année n'est pas mentionnée, utilise l'année de la date d'aujourd'hui fournie en contexte]
+**Durée :** [durée]
+**Participants :** [liste des participants]
+**Type de réunion métier :** [type]
+**Format :** [remote / présentiel / hybride]
+
+**Contexte et objectif :**
+[1-2 phrases]
+
+**Synthèse exécutive :**
+[5 lignes max]
+
+---
+
+## Sujets abordés
+[Structurés par thème avec ### pour chaque sous-thème]
+
+## Décisions prises
+[Liste numérotée]
+
+## Actions à mener
+[Bullets : une action par ligne, formulée ainsi → **[Responsable] :** action à réaliser *(échéance si mentionnée)*]
+
+## Points de vigilance / risques
+[Bullets]
+
+## Questions ouvertes
+[Bullets — omettre la section si aucune]
+
+## Points à confirmer
+[Bullets — omettre la section si aucune]
 
 ---
 
 Règles de style :
+- Respecter EXACTEMENT les titres de section avec ## ci-dessus
 - Ton neutre et professionnel
-- Phrases courtes
-- Bullets privilégiées
+- Phrases courtes pour les bullets, texte rédigé pour la synthèse
 - Zéro jargon inutile
 - Markdown uniquement

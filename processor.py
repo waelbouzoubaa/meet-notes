@@ -32,11 +32,14 @@ OUTPUT_DIR = Path(__file__).parent / "reports"
 # ── Template helpers ──────────────────────────────────────────────────────────
 
 def list_templates() -> list[str]:
-    """Return sorted list of template names (without .txt extension)."""
+    """Return template names — socle_commun toujours en premier, custom toujours en dernier."""
     if not TEMPLATES_DIR.exists():
-        return []
+        return ["socle_commun", "custom"]
     names = sorted(p.stem for p in TEMPLATES_DIR.glob("*.txt"))
-    return names + ["custom"]
+    pinned = "socle_commun"
+    others = [n for n in names if n != pinned]
+    result = ([pinned] if pinned in names else []) + others
+    return result + ["custom"]
 
 
 def load_template(name: str) -> str:
