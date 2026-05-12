@@ -122,6 +122,25 @@ def _strip_md_inline(text: str) -> str:
     return text.strip()
 
 
+def _add_inline_bold(para, text: str, size_pt: int = 10, color: RGBColor = None) -> None:
+    """Ajoute du texte avec gras inline (**bold**) dans un paragraphe DOCX."""
+    if color is None:
+        color = DARK
+    for part in re.split(r'(\*\*[^*]+\*\*)', text):
+        clean = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', part)
+        if clean.startswith('**') and clean.endswith('**'):
+            run = para.add_run(clean[2:-2])
+            run.bold = True
+        else:
+            # Préserver les espaces, juste retirer les marqueurs markdown
+            clean = re.sub(r'\*{1,2}(.+?)\*{1,2}', r'\1', clean)
+            clean = re.sub(r'`(.+?)`', r'\1', clean)
+            run = para.add_run(clean)
+            run.bold = False
+        run.font.size      = Pt(size_pt)
+        run.font.color.rgb = color
+
+
 # ── Header ────────────────────────────────────────────────────────────────────
 
 def _build_header(doc: Document) -> None:
@@ -288,21 +307,33 @@ def _render_markdown(doc: Document, markdown: str) -> None:
                 run.font.size      = Pt(10)
                 run.font.color.rgb = DARK
 
-            # Puce
-            elif line.startswith(("- ", "* ", "+ ")):
-                p   = doc.add_paragraph(style="List Bullet")
-                run = p.add_run(_strip_md_inline(line[2:]))
-                run.font.size      = Pt(10)
-                run.font.color.rgb = DARK
+            # Sous-bullet (indentation dans raw, avant le bullet principal)
+            elif re.match(r'^\s+[-*+]\s+', raw):
+                text = re.sub(r'^\s+[-*+]\s+', '', raw)
+                p    = doc.add_paragraph(style="List Bullet 2")
+                p.paragraph_format.space_after = Pt(1)
+                _add_inline_bold(p, text, size_pt=9, color=DARK)
 
-            # Puce indentée
-            elif line.startswith(("  - ", "  * ")):
-                p   = doc.add_paragraph(style="List Bullet 2")
-                run = p.add_run(_strip_md_inline(line[4:]))
-                run.font.size      = Pt(9)
-                run.font.color.rgb = MUTED
+            # Bullet principal
+            elif re.match(r'^[-*+]\s+', raw):
+                text = re.sub(r'^[-*+]\s+', '', raw)
+                p    = doc.add_paragraph(style="List Bullet")
+                p.paragraph_format.space_after = Pt(1)
+                _add_inline_bold(p, text, size_pt=10, color=DARK)
 
-            # Séparateur --- (gris clair comme PDF)
+            # Ligne entièrement en gras → même style H2 bleu
+            elif re.match(r'^\*\*[^*]+\*\*\s*:?\s*$', line):
+                p = doc.add_paragraph()
+                p.paragraph_format.space_before = Pt(8)
+                p.paragraph_format.space_after  = Pt(4)
+                _para_bg(p, _HEX["light"])
+                _para_border(p, "left", _HEX["blue"], sz="24", space="4")
+                run = p.add_run(_strip_md_inline(line))
+                run.bold           = True
+                run.font.size      = Pt(11)
+                run.font.color.rgb = BLUE
+
+            # Séparateur ---
             elif line.startswith("---"):
                 p = doc.add_paragraph()
                 p.paragraph_format.space_before = Pt(2)
@@ -313,6 +344,12 @@ def _render_markdown(doc: Document, markdown: str) -> None:
             elif line == "":
                 p = doc.add_paragraph()
                 p.paragraph_format.space_after = Pt(2)
+
+            # Texte avec gras inline
+            elif '**' in line:
+                p = doc.add_paragraph()
+                p.paragraph_format.space_after = Pt(2)
+                _add_inline_bold(p, line, size_pt=10, color=DARK)
 
             # Texte normal
             else:
