@@ -714,6 +714,22 @@ if ss.phase == "upload":
     audio_source   = uploaded_file or (recorded_audio is not None and recorded_audio)
     audio_is_rec   = recorded_audio is not None and not uploaded_file
 
+    # Après une annulation, _pending_bytes est encore en mémoire → bouton relancer
+    if not audio_source and ss.get("_pending_bytes") and ss.get("_pending_display"):
+        icon, _ = tmeta(selected_template)
+        st.markdown(
+            f'<div class="info-strip">📎 <strong>{ss._pending_display}</strong>'
+            f'&nbsp;·&nbsp;Template : <strong>{icon} {selected_template.replace("_"," ").title()}</strong>'
+            f'&nbsp;·&nbsp;<em>analyse annulée</em></div>',
+            unsafe_allow_html=True)
+        if st.button("▶  Relancer l'analyse", type="primary"):
+            ss._extra_context   = extra_context
+            ss._transcript_only = transcript_only
+            ss._pending_engine  = engine
+            ss._pending_docs    = [(d.name, bytes(d.getbuffer())) for d in (uploaded_docs or [])]
+            ss.phase            = "transcribing"
+            st.rerun()
+
     if audio_source:
         if audio_is_rec:
             display_name = f"enregistrement{recorded_audio_ext}"
@@ -757,31 +773,63 @@ if ss.phase == "upload":
 # PHASE 1b — Transcription en cours
 # ══════════════════════════════════════════════════════════════════════════════
 elif ss.phase == "transcribing":
-    with tempfile.NamedTemporaryFile(delete=False, suffix=ss._pending_suffix) as tmp:
-        tmp.write(ss._pending_bytes)
-        tmp_path = Path(tmp.name)
-    try:
-        _engine = getattr(ss, "_pending_engine", "gemini")
-        _engine_label = "AssemblyAI" if _engine == "assemblyai" else "Gemini Files API"
-        with st.status("Transcription en cours…", expanded=True) as status:
-            st.write(f"Envoi de **{ss._pending_display}** vers {_engine_label}…")
-            transcript, elapsed = transcribe_audio(tmp_path, language, engine=_engine)
-            status.update(label=f"Transcription terminée en {elapsed:.1f} s",
-                state="complete", expanded=False)
-    except Exception as e:
-        st.error(f"Erreur transcription : {e}")
-        tmp_path.unlink(missing_ok=True)
+    import threading, time as _time
+
+    # Premier passage : écrire le fichier tmp et démarrer le thread
+    if "_tr_state" not in ss:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ss._pending_suffix) as tmp:
+            tmp.write(ss._pending_bytes)
+            _tmp_path = Path(tmp.name)
+
+        _state = {"status": "running", "transcript": None, "elapsed": None, "error": None}
+        ss._tr_state = _state
+        _engine = getattr(ss, "_pending_engine", "assemblyai")
+
+        def _run_transcription(state, tmp_path, lang, eng):
+            try:
+                t, elapsed = transcribe_audio(Path(tmp_path), lang, engine=eng)
+                state["transcript"] = t
+                state["elapsed"]    = elapsed
+                state["status"]     = "done"
+            except Exception as exc:
+                state["error"]  = str(exc)
+                state["status"] = "error"
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+
+        threading.Thread(
+            target=_run_transcription,
+            args=(ss._tr_state, str(_tmp_path), language, _engine),
+            daemon=True,
+        ).start()
+
+    state = ss._tr_state
+
+    if state["status"] == "done":
+        ss.transcript_raw        = state["transcript"]
+        ss.transcript_named      = state["transcript"]
+        ss.audio_stem            = ss._pending_stem
+        ss.elapsed_transcription = state["elapsed"]
+        del ss["_tr_state"]
+        ss.phase = "transcribed"
+        st.rerun()
+
+    elif state["status"] == "error":
+        st.error(f"Erreur transcription : {state['error']}")
+        del ss["_tr_state"]
         ss.phase = "upload"
         st.stop()
-    finally:
-        tmp_path.unlink(missing_ok=True)
 
-    ss.transcript_raw        = transcript
-    ss.transcript_named      = transcript
-    ss.audio_stem            = ss._pending_stem
-    ss.elapsed_transcription = elapsed
-    ss.phase                 = "transcribed"
-    st.rerun()
+    else:
+        _engine_label = "AssemblyAI" if getattr(ss, "_pending_engine", "assemblyai") == "assemblyai" else "Gemini"
+        with st.status("Transcription en cours…", expanded=True):
+            st.write(f"Envoi de **{ss._pending_display}** vers {_engine_label}…")
+        if st.button("❌ Annuler l'analyse", type="secondary"):
+            del ss["_tr_state"]
+            ss.phase = "upload"
+            st.rerun()
+        _time.sleep(2)
+        st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -889,34 +937,63 @@ elif ss.phase == "transcribed":
 # PHASE 2b — Génération du rapport
 # ══════════════════════════════════════════════════════════════════════════════
 elif ss.phase == "reporting":
-    system_prompt = build_system_prompt(
-        ss._pending_template,
-        ss._pending_extra_context,
-        ss._pending_custom_prompt,
-    )
-    try:
-        with st.status("Génération du rapport…", expanded=True) as status:
-            st.write(f"Analyse avec le template **{ss._pending_template.replace('_',' ').title()}**…")
+    import threading, time as _time
 
-            # Build document parts if any docs were uploaded
-            doc_parts = []
-            pending_docs = getattr(ss, "_pending_docs", [])
-            if pending_docs:
-                from doc_extract import build_doc_parts
-                for doc_name, doc_bytes in pending_docs:
-                    st.write(f"Analyse du document **{doc_name}**…")
-                    doc_parts.extend(build_doc_parts(doc_bytes, doc_name))
+    if "_rp_state" not in ss:
+        system_prompt = build_system_prompt(
+            ss._pending_template,
+            ss._pending_extra_context,
+            ss._pending_custom_prompt,
+        )
+        _state = {"status": "running", "report": None, "error": None}
+        ss._rp_state = _state
 
-            report = summarize_transcript(ss.transcript_named, system_prompt=system_prompt, doc_parts=doc_parts or None)
-            status.update(label="Rapport généré avec succès !", state="complete", expanded=False)
-    except Exception as e:
-        st.error(f"Erreur génération : {e}")
+        pending_docs = getattr(ss, "_pending_docs", [])
+
+        def _run_report(state, transcript, prompt, docs):
+            try:
+                doc_parts = []
+                if docs:
+                    from doc_extract import build_doc_parts
+                    for doc_name, doc_bytes in docs:
+                        doc_parts.extend(build_doc_parts(doc_bytes, doc_name))
+                report = summarize_transcript(transcript, system_prompt=prompt, doc_parts=doc_parts or None)
+                state["report"]  = report
+                state["status"]  = "done"
+            except Exception as exc:
+                state["error"]  = str(exc)
+                state["status"] = "error"
+
+        threading.Thread(
+            target=_run_report,
+            args=(ss._rp_state, ss.transcript_named, system_prompt, pending_docs),
+            daemon=True,
+        ).start()
+
+    state = ss._rp_state
+
+    if state["status"] == "done":
+        ss.report = state["report"]
+        save_output(ss.report, ss.audio_stem, "report", "MANUAL", None)
+        del ss["_rp_state"]
+        ss.phase = "reported"
+        st.rerun()
+
+    elif state["status"] == "error":
+        st.error(f"Erreur génération : {state['error']}")
+        del ss["_rp_state"]
         ss.phase = "transcribed"
         st.stop()
-    ss.report = report
-    save_output(report, ss.audio_stem, "report", "MANUAL", None)
-    ss.phase = "reported"
-    st.rerun()
+
+    else:
+        with st.status("Génération du rapport…", expanded=True):
+            st.write(f"Analyse avec le template **{ss._pending_template.replace('_',' ').title()}**…")
+        if st.button("❌ Annuler la génération", type="secondary"):
+            del ss["_rp_state"]
+            ss.phase = "transcribed"
+            st.rerun()
+        _time.sleep(2)
+        st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
