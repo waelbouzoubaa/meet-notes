@@ -379,6 +379,7 @@ defaults = {
     "report": "",
     "audio_stem": "",
     "elapsed_transcription": 0.0,
+    "selected_template": "socle_commun",
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -463,7 +464,10 @@ with st.sidebar:
 
     selected_template = st.selectbox("Template", options=available_templates,
         format_func=lambda t: template_labels.get(t, t),
-        label_visibility="collapsed")
+        label_visibility="collapsed",
+        index=available_templates.index(ss.get("selected_template", "socle_commun"))
+              if ss.get("selected_template", "socle_commun") in available_templates else 0,
+        key="selected_template")
 
     st.caption(tmeta(selected_template)[1])
 

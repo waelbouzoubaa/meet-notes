@@ -75,7 +75,9 @@ def summarize_transcript(
     client = genai.Client(api_key=GEMINI_API_KEY)
     prompt = system_prompt if system_prompt is not None else SYSTEM_PROMPT
 
-    parts: list = [types.Part.from_text(text=f"Voici le transcript de réunion à résumer :\n\n{transcript}")]
+    from datetime import date
+    today = date.today().strftime("%d %B %Y")
+    parts: list = [types.Part.from_text(text=f"Date d'aujourd'hui : {today}\n\nVoici le transcript de réunion à résumer :\n\n{transcript}")]
 
     if doc_parts:
         parts.append(types.Part.from_text(
