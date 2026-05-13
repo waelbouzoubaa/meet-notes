@@ -117,14 +117,29 @@ class RameryPDF(FPDF):
 # ── Renderer markdown ───────────────────────────────────────────────────────
 def _render_markdown(pdf: RameryPDF, markdown: str) -> None:
     W = 174
-    in_table  = False
-    row_index = 0
+    in_table          = False
+    row_index         = 0
+    in_prompt_section = False
 
     for raw in markdown.splitlines():
         line = raw.strip()
 
         try:
             pdf.set_x(18)
+
+            # Mode texte littéral (section prompt — garde ##, **, - visibles)
+            if in_prompt_section:
+                clean = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
+                if clean.strip() == "":
+                    pdf.ln(2)
+                else:
+                    pdf.set_font("DejaVu", "", 7.5)
+                    pdf.set_text_color(*MUTED)
+                    pdf.multi_cell(W, 4.5, clean)
+                continue
+
+            if line == "## Prompt utilisé":
+                in_prompt_section = True  # active après rendu du titre H2
 
             # H1
             if line.startswith("# ") and not line.startswith("## "):

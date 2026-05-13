@@ -920,8 +920,12 @@ elif ss.phase == "transcribed":
         if speakers:
             import pandas as pd
             _id_col = "Identifiant"
+            _saved_map = ss.get("_speaker_map", {})
             edited_df = st.data_editor(
-                pd.DataFrame({_id_col: speakers, "Vrai nom": [""] * len(speakers)}),
+                pd.DataFrame({
+                    _id_col: speakers,
+                    "Vrai nom": [_saved_map.get(s, "") for s in speakers],
+                }),
                 column_config={
                     _id_col: st.column_config.TextColumn(disabled=True),
                     "Vrai nom": st.column_config.TextColumn(max_chars=50),
@@ -945,6 +949,7 @@ elif ss.phase == "transcribed":
 
     btn_label = "💾  Enregistrer le transcript" if transcript_only else "▶  Générer le rapport"
     if st.button(btn_label, type="primary"):
+        ss._speaker_map = speaker_map
         ss.transcript_named = (
             apply_speaker_names(ss.transcript_raw, speaker_map) if speaker_map
             else ss.transcript_raw
@@ -1007,7 +1012,13 @@ elif ss.phase == "reporting":
 
     if state["status"] == "done":
         template_display = ss._pending_template.replace('_', ' ').title()
-        footer_md = f"\n\n---\n\n**Template utilisé :** {template_display}"
+        prompt_content   = ss.get("_used_system_prompt", "")
+        footer_md = (
+            f"\n\n---\n\n"
+            f"## Prompt utilisé\n\n"
+            f"**Template :** {template_display}\n\n"
+            f"{prompt_content}"
+        )
         ss.report = state["report"] + footer_md
         save_output(ss.report, ss.audio_stem, "report", "MANUAL", None)
         del ss["_rp_state"]

@@ -259,6 +259,7 @@ def _render_table(doc: Document, md_lines: list[str]) -> None:
 
 def _render_markdown(doc: Document, markdown: str) -> None:
     table_buf: list[str] = []
+    in_prompt_section = False
 
     def flush_table():
         if table_buf:
@@ -275,6 +276,19 @@ def _render_markdown(doc: Document, markdown: str) -> None:
             flush_table()
 
         try:
+            # Mode texte littéral (section prompt)
+            if in_prompt_section:
+                clean = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw)
+                p   = doc.add_paragraph()
+                run = p.add_run(clean)
+                run.font.size      = Pt(8)
+                run.font.color.rgb = MUTED
+                p.paragraph_format.space_after = Pt(0)
+                continue
+
+            if line == "## Prompt utilisé":
+                in_prompt_section = True
+
             # H1 — bleu gras + filet rouge dessous
             if line.startswith("# ") and not line.startswith("## "):
                 p = doc.add_paragraph()
