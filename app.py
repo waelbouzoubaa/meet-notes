@@ -19,6 +19,8 @@ from processor import (
     apply_speaker_names,
     build_system_prompt,
     save_output,
+    parse_vtt,
+    to_vtt,
 )
 from transcribe import transcribe_audio
 from summarize import summarize_transcript
@@ -598,7 +600,7 @@ if ss.phase == "upload":
 
     with col_upload:
         st.markdown('<div class="card"><p class="card-label">Source audio</p>', unsafe_allow_html=True)
-        tab_upload, tab_record = st.tabs(["📁  Importer un fichier", "🎙  Enregistrer"])
+        tab_upload, tab_record, tab_transcript = st.tabs(["📁  Importer un fichier", "🎙  Enregistrer", "📄  Importer un transcript"])
 
         with tab_upload:
             uploaded_file = st.file_uploader("audio",
@@ -692,6 +694,35 @@ if ss.phase == "upload":
                 st.warning("Module `streamlit-mic-recorder` non installé.")
                 recorded_audio     = None
                 recorded_audio_ext = ".webm"
+
+        with tab_transcript:
+            st.caption("Importez un transcript existant (.vtt ou .txt) — la transcription est ignorée.")
+            transcript_file = st.file_uploader(
+                "transcript",
+                type=["vtt", "txt"],
+                label_visibility="collapsed",
+                help="Formats acceptés : .vtt (WebVTT — Teams, Zoom) · .txt (transcript brut)",
+            )
+            if transcript_file:
+                raw_content = transcript_file.read().decode("utf-8", errors="replace")
+                if transcript_file.name.lower().endswith(".vtt"):
+                    parsed = parse_vtt(raw_content)
+                    st.caption(f"VTT parsé : {len(parsed.splitlines())} segments détectés")
+                else:
+                    parsed = raw_content
+                    st.caption(f"Texte brut : {len(parsed.split())} mots")
+                st.text_area("Aperçu", value=parsed[:800] + ("…" if len(parsed) > 800 else ""),
+                    height=160, disabled=True, label_visibility="collapsed")
+                if st.button("▶  Utiliser ce transcript", type="primary", use_container_width=True):
+                    ss.transcript_raw        = parsed
+                    ss.transcript_named      = parsed
+                    ss.audio_stem            = Path(transcript_file.name).stem
+                    ss.elapsed_transcription = 0.0
+                    ss._extra_context        = ""
+                    ss._transcript_only      = False
+                    ss._pending_docs         = []
+                    ss.phase                 = "transcribed"
+                    st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1059,12 +1090,23 @@ elif ss.phase == "reported":
         with tab_transcript:
             st.text_area("t", value=ss.transcript_named, height=480,
                 label_visibility="collapsed", disabled=True)
-            st.download_button(
-                label="⬇  Télécharger le transcript (.txt)",
-                data=ss.transcript_named,
-                file_name=f"{ss.audio_stem}.txt",
-                mime="text/plain",
-            )
+            col_dl_txt, col_dl_vtt = st.columns(2)
+            with col_dl_txt:
+                st.download_button(
+                    label="⬇  Télécharger (.txt)",
+                    data=ss.transcript_named,
+                    file_name=f"{ss.audio_stem}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+            with col_dl_vtt:
+                st.download_button(
+                    label="⬇  Télécharger (.vtt)",
+                    data=to_vtt(ss.transcript_named),
+                    file_name=f"{ss.audio_stem}.vtt",
+                    mime="text/vtt",
+                    use_container_width=True,
+                )
     else:
         st.text_area("Transcript", value=ss.transcript_named, height=480,
             disabled=True, label_visibility="visible")

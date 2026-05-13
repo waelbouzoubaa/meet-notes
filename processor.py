@@ -56,6 +56,127 @@ def save_template(name: str, content: str) -> None:
     (TEMPLATES_DIR / f"{name}.txt").write_text(content, encoding="utf-8")
 
 
+# ── Transcript import helpers ─────────────────────────────────────────────────
+
+def parse_vtt(content: str) -> str:
+    """Convert a WebVTT transcript to the [HH:MM:SS] Speaker N : text format.
+
+    Handles:
+    - <v Speaker Name>text</v> tags (Teams/Zoom)
+    - Plain text blocks (no speaker labels)
+    - Both HH:MM:SS.mmm and MM:SS.mmm timestamp formats
+    """
+    lines = content.splitlines()
+    result: list[str] = []
+    current_ts: str | None = None
+    current_speaker: str | None = None
+    current_text: list[str] = []
+    speaker_counter: dict[str, int] = {}
+    speaker_next = 1
+
+    ts_re = re.compile(
+        r"^(?:(\d+):)?(\d{2}):(\d{2})[.,]\d+ --> "
+        r"(?:(\d+):)?(\d{2}):(\d{2})[.,]\d+"
+    )
+    voice_re = re.compile(r"<v\s+([^>]+)>(.*?)(?:</v>|$)", re.DOTALL)
+
+    def flush():
+        nonlocal current_ts, current_speaker, current_text
+        if current_ts and current_text:
+            text = " ".join(current_text).strip()
+            if text:
+                spk = current_speaker or "Speaker 1"
+                result.append(f"[{current_ts}] {spk} : {text}")
+        current_ts = None
+        current_speaker = None
+        current_text = []
+
+    for line in lines:
+        line = line.strip()
+
+        # Skip header and metadata
+        if line.startswith("WEBVTT") or line.startswith("NOTE") or line == "":
+            if line == "" and current_text:
+                flush()
+            continue
+
+        # Skip numeric cue identifiers
+        if re.match(r"^\d+$", line):
+            continue
+
+        # Timestamp line
+        m = ts_re.match(line)
+        if m:
+            flush()
+            h = int(m.group(1) or 0)
+            mi = int(m.group(2))
+            s = int(m.group(3))
+            total = h * 3600 + mi * 60 + s
+            hh, rem = divmod(total, 3600)
+            mm, ss = divmod(rem, 60)
+            current_ts = f"{hh:02d}:{mm:02d}:{ss:02d}"
+            continue
+
+        # Text line
+        if current_ts is not None:
+            # Try <v Speaker>text</v> format
+            vm = voice_re.search(line)
+            if vm:
+                raw_name = vm.group(1).strip()
+                text_part = re.sub(r"<[^>]+>", "", vm.group(2)).strip()
+                if raw_name not in speaker_counter:
+                    speaker_counter[raw_name] = speaker_next
+                    speaker_next += 1
+                current_speaker = f"Speaker {speaker_counter[raw_name]}"
+                if text_part:
+                    current_text.append(text_part)
+            else:
+                # Strip any remaining HTML tags
+                clean = re.sub(r"<[^>]+>", "", line).strip()
+                if clean:
+                    current_text.append(clean)
+
+    flush()
+    return "\n".join(result)
+
+
+def to_vtt(transcript: str) -> str:
+    """Convert [HH:MM:SS] Speaker N : text transcript to WebVTT format."""
+    ts_re = re.compile(r"^\[(\d{2}:\d{2}:\d{2})\]\s+(.*)")
+    lines = transcript.splitlines()
+    cues: list[tuple[str, str]] = []
+
+    for line in lines:
+        m = ts_re.match(line.strip())
+        if m:
+            cues.append((m.group(1), m.group(2).strip()))
+
+    if not cues:
+        return f"WEBVTT\n\n{transcript}"
+
+    vtt_lines = ["WEBVTT", ""]
+    for i, (ts, text) in enumerate(cues):
+        h, mi, s = (int(x) for x in ts.split(":"))
+        start_total = h * 3600 + mi * 60 + s
+        # End = next cue start - 1s, or start + 5s for last cue
+        if i + 1 < len(cues):
+            nh, nmi, ns = (int(x) for x in cues[i + 1][0].split(":"))
+            end_total = max(nh * 3600 + nmi * 60 + ns - 1, start_total + 1)
+        else:
+            end_total = start_total + 5
+
+        def fmt(t: int) -> str:
+            hh, rem = divmod(t, 3600)
+            mm, ss = divmod(rem, 60)
+            return f"{hh:02d}:{mm:02d}:{ss:02d}.000"
+
+        vtt_lines.append(f"{fmt(start_total)} --> {fmt(end_total)}")
+        vtt_lines.append(text)
+        vtt_lines.append("")
+
+    return "\n".join(vtt_lines)
+
+
 # ── Speaker helpers ───────────────────────────────────────────────────────────
 
 def extract_speakers(transcript: str) -> list[str]:
