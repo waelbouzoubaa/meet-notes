@@ -945,6 +945,8 @@ elif ss.phase == "reporting":
             ss._pending_extra_context,
             ss._pending_custom_prompt,
         )
+        ss._used_system_prompt = system_prompt
+        ss._used_template      = ss._pending_template
         _state = {"status": "running", "report": None, "error": None}
         ss._rp_state = _state
 
@@ -973,7 +975,9 @@ elif ss.phase == "reporting":
     state = ss._rp_state
 
     if state["status"] == "done":
-        ss.report = state["report"]
+        template_display = ss._pending_template.replace('_', ' ').title()
+        footer_md = f"\n\n---\n\n**Template utilisé :** {template_display}"
+        ss.report = state["report"] + footer_md
         save_output(ss.report, ss.audio_stem, "report", "MANUAL", None)
         del ss["_rp_state"]
         ss.phase = "reported"
@@ -1013,6 +1017,9 @@ elif ss.phase == "reported":
 
         with tab_report:
             st.markdown(ss.report)
+            if ss.get("_used_system_prompt"):
+                with st.expander("🔧 Voir le prompt utilisé", expanded=False):
+                    st.code(ss._used_system_prompt, language="text")
             st.divider()
             col_md, col_docx, col_pdf = st.columns(3)
             with col_md:
